@@ -1,0 +1,171 @@
+{
+  "users": [
+    {
+      "name": "Stefia",
+      "email": "stefia.a@elblearning.com",
+      "product": "CenarioVR Studio & Studio Platform Services - AI Toolkit",
+      "stakeholderAccessLevel": "View",
+      "slackChannel": "#cenariovr-feedback",
+      "status": "Active",
+      "id": "1766382258813",
+      "createdAt": "2025-12-22T05:44:18.813Z",
+      "slackNotification": true,
+      "gmailNotification": true,
+      "slackNotificationStatus": "Sent",
+      "gmailNotificationStatus": "Sent",
+      "lastNotifiedAt": "2026-01-27T13:51:23.873Z"
+    },
+    {
+      "name": "Neha",
+      "email": "neha.g@elblearning.com",
+      "product": "MicroBuilder",
+      "stakeholderAccessLevel": "View",
+      "slackChannel": "#elb-microbuilder-feedback",
+      "status": "Active",
+      "slackNotification": true,
+      "gmailNotification": false,
+      "id": "1767098265826",
+      "createdAt": "2025-12-30T12:37:45.826Z",
+      "slackNotificationStatus": "Sent",
+      "gmailNotificationStatus": "Not Sent",
+      "lastNotifiedAt": "2025-12-30T14:13:06.365Z"
+    },
+    {
+      "name": "Mannar",
+      "email": "mannarmannan.g@elblearning.com",
+      "product": "Review Link",
+      "stakeholderAccessLevel": "View",
+      "slackChannel": "#review-link-feedback",
+      "status": "Active",
+      "slackNotification": false,
+      "gmailNotification": true,
+      "id": "1767098982702",
+      "createdAt": "2025-12-30T12:49:42.702Z",
+      "slackNotificationStatus": "Not Sent",
+      "gmailNotificationStatus": "Sent",
+      "lastNotifiedAt": "2026-01-05T12:36:55.772Z"
+    },
+    {
+      "name": "Neha",
+      "email": "neha.g@elblearning.com",
+      "product": "Lectora Online",
+      "stakeholderAccessLevel": "View",
+      "slackChannel": "#lectora-online-feedback",
+      "status": "Active",
+      "slackNotification": true,
+      "gmailNotification": false,
+      "id": "1767103549728",
+      "createdAt": "2025-12-30T14:05:49.728Z",
+      "slackNotificationStatus": "Sent",
+      "gmailNotificationStatus": "Not Sent",
+      "lastNotifiedAt": "2025-12-30T14:06:50.488Z"
+    },
+    {
+      "name": "Malayan",
+      "email": "malayan.k@elblearning.com",
+      "product": "CourseMill",
+      "stakeholderAccessLevel": "Edit",
+      "slackChannel": "#coursemill-feedback",
+      "status": "Active",
+      "slackNotification": false,
+      "gmailNotification": true,
+      "id": "1767335135885",
+      "createdAt": "2026-01-02T06:25:35.885Z",
+      "slackNotificationStatus": "Not Sent",
+      "gmailNotificationStatus": "Sent",
+      "lastNotifiedAt": "2026-01-05T12:28:00.431Z"
+    }
+  ],
+  "products": [
+    {
+      "id": "1",
+      "name": "MicroBuilder"
+    },
+    {
+      "id": "2",
+      "name": "Lectora Online"
+    },
+    {
+      "id": "3",
+      "name": "The Training Arcade"
+    },
+    {
+      "id": "4",
+      "name": "Rehearsal & RolePlay"
+    },
+    {
+      "id": "5",
+      "name": "Rockstar Learning Platform"
+    },
+    {
+      "id": "6",
+      "name": "CourseMill"
+    },
+    {
+      "id": "7",
+      "name": "CenarioVR Studio & Studio Platform Services - AI Toolkit"
+    },
+    {
+      "id": "8",
+      "name": "Lectora Desktop"
+    },
+    {
+      "id": "9",
+      "name": "Review Link"
+    },
+    {
+      "id": "10",
+      "name": "Asset Library Interface / Keeper"
+    },
+    {
+      "id": "11",
+      "name": "Spice - New Development"
+    }
+  ],
+  "slackChannels": [
+    {
+      "id": "1",
+      "name": "#elb-microbuilder-feedback"
+    },
+    {
+      "id": "2",
+      "name": "#asset-library-feedback"
+    },
+    {
+      "id": "3",
+      "name": "#cenariovr-feedback"
+    },
+    {
+      "id": "4",
+      "name": "#coursemill-feedback"
+    },
+    {
+      "id": "5",
+      "name": "#lectora-online-feedback"
+    },
+    {
+      "id": "6",
+      "name": "#rehearsal-roleplay-feedback"
+    },
+    {
+      "id": "7",
+      "name": "#review-link-feedback"
+    },
+    {
+      "id": "8",
+      "name": "#rockstar-learning-platform-feedback"
+    },
+    {
+      "id": "9",
+      "name": "#the-training-arcade-feedback"
+    },
+    {
+      "id": "10",
+      "name": "#spice-feedback"
+    },
+    {
+      "id": "11",
+      "name": "#lectora-desktop-feedback"
+    }
+  ]
+}
