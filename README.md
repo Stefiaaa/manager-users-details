@@ -187,16 +187,22 @@ src/
 - `GET /products` - Get all products
 - `GET /slackChannels` - Get all Slack channels
 
-## Slack Integration
+## Slack & Gmail Integration (Production)
 
-The application includes a mock Slack notification service that simulates sending notifications. In production, you would configure the `REACT_APP_SLACK_WEBHOOK_URL` environment variable to use actual Slack webhooks.
+Slack and Gmail are handled by the backend proxy (Render). The frontend calls the proxy via:
 
-### Environment Variables
+- `REACT_APP_PROXY_BASE_URL=https://your-render-url.onrender.com`
 
-Create a `.env` file in the root directory:
+### Backend Environment Variables (Render)
 
-```env
-REACT_APP_SLACK_WEBHOOK_URL=your_slack_webhook_url_here
+Set only the tokens you need:
+
+```
+SLACK_WEBHOOK_TOKEN_ADMIN=...
+SLACK_BOT_TOKEN_MICROBUILDER=...
+SLACK_WEBHOOK_TOKEN_MICROBUILDER=...
+# ... other products as needed
+GMAIL_APPS_SCRIPT_URL=https://script.google.com/macros/s/your-script-id/exec
 ```
 
 ## Scripts

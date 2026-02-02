@@ -7,8 +7,8 @@ import { getProductWebhook } from '../config/slackWebhooks';
 // Channel membership management uses webhook notifications to announce changes
 // (Actual Slack channel membership requires backend integration with Slack Web API)
 
-// Disable webhook notifications - users are added/removed silently
-const USE_WEBHOOK_NOTIFICATIONS = false;
+// Enable webhook notifications when proxy is configured
+const USE_WEBHOOK_NOTIFICATIONS = true;
 
 const PROXY_BASE_URL = process.env.REACT_APP_PROXY_BASE_URL || '';
 const isProxyConfigured = (): boolean => Boolean(PROXY_BASE_URL) || process.env.NODE_ENV !== 'production';
@@ -153,7 +153,7 @@ export const sendSlackNotification = async (
     if (webhookConfig && USE_WEBHOOK_NOTIFICATIONS) {
       console.log(`📤 Sending Slack notification to ${webhookConfig.channelName}...`);
       
-      const response = await fetch(webhookConfig.slackWebhook, {
+      const response = await fetch(buildProxyUrl(webhookConfig.slackWebhook), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

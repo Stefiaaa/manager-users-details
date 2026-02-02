@@ -12,8 +12,8 @@ import { hasProductChannel } from '../config/slackChannelConfig';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
 
-// Disable webhook notifications - users are added/removed silently
-const USE_WEBHOOK_NOTIFICATIONS = false;
+// Enable webhook notifications when proxy is configured
+const USE_WEBHOOK_NOTIFICATIONS = true;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
