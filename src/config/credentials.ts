@@ -15,7 +15,7 @@ export interface AdminUser {
 
 export const ADMIN_USERS: AdminUser[] = [
   {
-    email: 'stefia.a@elblearning.com',
+    email: 'neha.g@elblearning.com',
     password: 'admin123',
     name: 'Super Admin',
   },
