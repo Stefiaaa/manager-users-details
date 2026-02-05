@@ -209,8 +209,8 @@ const UserTable: React.FC<UserTableProps> = ({
 
   return (
     <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
-      <TableContainer sx={{ overflowX: 'auto' }}>
-        <Table sx={{ tableLayout: 'fixed', minWidth: 1000 }}>
+      <TableContainer sx={{ overflowX: 'hidden' }}>
+        <Table sx={{ tableLayout: 'fixed', width: '100%' }}>
           <TableHead>
             <TableRow
               sx={{
