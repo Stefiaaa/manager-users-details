@@ -4,6 +4,8 @@
  * Channel names must match exactly what's in your Slack workspace (without the #)
  */
 
+import type { SlackChannel } from '../types';
+
 export interface ProductChannelMapping {
   productName: string;
   channelId: string;
@@ -98,6 +100,17 @@ export const getProductChannelName = (productName: string): string | undefined =
 export const getProductChannelId = (productName: string): string | undefined => {
   const mapping = PRODUCT_CHANNEL_MAP[productName];
   return mapping?.channelId;
+};
+
+/**
+ * Fallback list of Slack channels when API /slackChannels is unavailable.
+ * Used so the Add/Edit User form always has channel options.
+ */
+export const getFallbackSlackChannels = (): SlackChannel[] => {
+  return Object.values(PRODUCT_CHANNEL_MAP).map((m, i) => ({
+    id: String(i + 1),
+    name: m.channelName,
+  }));
 };
 
 export default PRODUCT_CHANNEL_MAP;

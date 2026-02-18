@@ -16,11 +16,13 @@ import theme from './theme';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './components/LoginPage';
 import Header from './components/Header';
+// import FeedbackFormPage from './components/FeedbackFormPage';  // feedback form – commented out
 import FilterBar from './components/FilterBar';
 import UserTable from './components/UserTable';
 import UserFormModal from './components/UserFormModal';
 import RevokeConfirmDialog from './components/RevokeConfirmDialog';
 import { User, UserFormData, TableFilters, PaginationState, UserOperationResult } from './types';
+// import { createFormAccessSession } from './utils/feedbackFormAccess';  // feedback form – commented out
 
 // Loading screen component
 const LoadingScreen: React.FC = () => (
@@ -188,6 +190,12 @@ const DashboardContent: React.FC = () => {
     setPagination({ page: 0, rowsPerPage });
   }, []);
 
+  // Feedback form – commented out
+  // const handleOpenFeedbackForm = useCallback(() => {
+  //   const token = createFormAccessSession();
+  //   window.location.assign(`/feedback-form?token=${encodeURIComponent(token)}`);
+  // }, []);
+
   return (
     <Box
       sx={{
@@ -242,6 +250,8 @@ const DashboardContent: React.FC = () => {
 // App content with authentication check
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  // Feedback form route – commented out
+  // const isFeedbackRoute = window.location.pathname.startsWith('/feedback-form');
 
   if (isLoading) {
     return <LoadingScreen />;
@@ -250,6 +260,10 @@ const AppContent: React.FC = () => {
   if (!isAuthenticated) {
     return <LoginPage />;
   }
+
+  // if (isFeedbackRoute) {
+  //   return <FeedbackFormPage />;
+  // }
 
   return <DashboardContent />;
 };

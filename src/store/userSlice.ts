@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { User, UserFormData, UsersState, UserOperationResult } from '../types';
 import { userService, productService, slackChannelService } from '../services/api';
+import { getFallbackSlackChannels } from '../config/slackChannelConfig';
 import { 
   addUserToProductChannel, 
   removeUserFromProductChannel
@@ -26,8 +27,12 @@ export const fetchProducts = createAsyncThunk('users/fetchProducts', async () =>
 });
 
 export const fetchSlackChannels = createAsyncThunk('users/fetchSlackChannels', async () => {
-  const channels = await slackChannelService.getAll();
-  return channels;
+  try {
+    const channels = await slackChannelService.getAll();
+    return channels?.length ? channels : getFallbackSlackChannels();
+  } catch {
+    return getFallbackSlackChannels();
+  }
 });
 
 export const addUser = createAsyncThunk(
@@ -149,6 +154,9 @@ const userSlice = createSlice({
       // Fetch slack channels
       .addCase(fetchSlackChannels.fulfilled, (state, action) => {
         state.slackChannels = action.payload;
+      })
+      .addCase(fetchSlackChannels.rejected, (state) => {
+        state.slackChannels = getFallbackSlackChannels();
       })
       // Add user
       .addCase(addUser.pending, (state) => {

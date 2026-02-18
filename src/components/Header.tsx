@@ -7,7 +7,11 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  // onOpenFeedbackForm?: () => void;  // feedback form – commented out
+}
+
+const Header: React.FC<HeaderProps> = () => {
   const { user, logout } = useAuth();
 
   const handleLogout = () => {
@@ -147,6 +151,19 @@ const Header: React.FC = () => {
               display: { xs: 'none', sm: 'flex' },
             }}
           />
+
+          {/* Feedback form button – commented out
+          {onOpenFeedbackForm && (
+            <Button
+              variant="contained"
+              startIcon={<FeedbackIcon />}
+              onClick={onOpenFeedbackForm}
+              sx={{ ... }}
+            >
+              Feedback Form
+            </Button>
+          )}
+          */}
 
           <Button
             variant="outlined"
