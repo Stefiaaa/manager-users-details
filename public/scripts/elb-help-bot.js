@@ -370,15 +370,22 @@
   function buildCandidateIndexUrls(base) {
     var candidates = [];
     if (base) {
+      candidates.push(base + 'content-index.json');
       candidates.push(base + 'sample-index.json');
       if (base.length > 1 && base.charAt(base.length - 1) === '/') {
         var parent = base.substring(0, base.length - 1);
         var pi = parent.lastIndexOf('/');
-        if (pi >= 0) candidates.push(parent.substring(0, pi + 1) + 'sample-index.json');
+        if (pi >= 0) {
+          candidates.push(parent.substring(0, pi + 1) + 'content-index.json');
+          candidates.push(parent.substring(0, pi + 1) + 'sample-index.json');
+        }
       }
     }
+    candidates.push('./content-index.json');
     candidates.push('./sample-index.json');
+    candidates.push('../content-index.json');
     candidates.push('../sample-index.json');
+    candidates.push('/content-index.json');
     candidates.push('/sample-index.json');
     return candidates;
   }
@@ -2391,7 +2398,7 @@
       if ((_indexUrl && isValidIndexUrl(_indexUrl)) || hasInline) {
         _bootIndex(_indexUrl);
       } else {
-        debugLog('INDEX-AUTO-DISCOVER', { reason: 'No indexUrl configured — probing for sample-index.json' });
+        debugLog('INDEX-AUTO-DISCOVER', { reason: 'No indexUrl configured — probing for content-index.json / sample-index.json' });
         _indexLoading = true;
         updateStatus('loading');
         renderWelcome();

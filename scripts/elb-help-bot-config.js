@@ -1,37 +1,37 @@
 /**
  * ELB Help Bot — Config File (HTML / JavaScript) v3.16.0
  *
- * COPY THIS FILE to your application. EDIT ONLY THESE VALUES.
- * No other changes needed.
+ * HOW TO USE THIS FILE:
+ * 1. Copy this file along with elb-help-bot.js to your website folder.
+ * 2. Edit ONLY the two values in the "EDIT THESE VALUES" section below.
+ * 3. Add this line before </body> in your HTML page:
+ *      <script src="elb-help-bot-config.js"></script>
  *
- * Add this line before </body> in your HTML:
- *   <script src="path/to/elb-help-bot-config.js"></script>
+ * That's it — the chatbot will appear on your page.
  *
- * ALL v3.16 features (query-isolated product-priority search, sticky starred sections,
- * "New Post" direct link to topics/create, product Quick Start Guides
- * with tag badges, built-in content index, zero-config auto-discovery,
- * flicker-free rendering, spell correction, TF-IDF semantic search,
- * paragraph anchoring, differentiated highlighting, inline content,
- * reinforcement learning, result validation, debug pipeline, and all
- * prior v3.x features) are built into elb-help-bot.js.
- *
- * NO INDEX CONFIGURATION NEEDED: The content index is built into the
- * chatbot script. It works immediately with zero configuration.
- * Optionally set indexUrl to override with your own custom index.
+ * The content index (article database) is already built into elb-help-bot.js.
+ * No additional index file is needed unless you want to use your own custom articles.
  */
 (function() {
   'use strict';
 
   // ==================== EDIT THESE VALUES ====================
-  var product   = 'general';   // Your product: lectora, cenariovr, training-arcade, microbuilder, rockstar, rehearsal, coursemill, reviewlink, learning-creation-studio, general
-  var scriptUrl = 'http://localhost/Manager_users_details/scripts/elb-help-bot.js';   // URL or path to elb-help-bot.js (relative or absolute)
+
+  var product   = 'general';           // Your product slug (see INSTRUCTIONS.md for the full list)
+  var scriptUrl = 'http://localhost/Manager_users_details/scripts/elb-help-bot.js';   // Path to elb-help-bot.js (change if it is in a different folder)
+
   // ============================================================
 
-  // Optional — set ONLY if you have custom overrides:
-  var configUrl    = '';   // Theme & product overrides JSON
-  var indexUrl     = '';   // Leave empty to use built-in index, or set a custom index URL
-  var analyticsUrl = '';   // POST endpoint for query analytics
-  var debugMode    = false; // Set to true for debug pipeline logging
+
+  // ==================== OPTIONAL — change only if needed ====================
+
+  var indexUrl     = '';    // Path or URL to your custom content-index.json (leave empty to use the built-in index)
+  var configUrl    = '';    // URL to a theme/product overrides JSON file (rarely needed)
+  var analyticsUrl = '';    // POST endpoint URL for query analytics (rarely needed)
+  var debugMode    = false; // Set to true to enable troubleshooting logs in the browser Console
+
+  // =========================================================================
+
 
   window.productContext = { product: product };
   if (configUrl)    window.elbHelpBotConfigUrl = configUrl;

@@ -14,18 +14,8 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-    <!-- ELB Help Bot — inline config ensures correct URLs on all devices (avoids localhost/cache issues) -->
-    <script>
-      (function() {
-        var base = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : '';
-        window.productContext = { product: 'general' };
-        window.elbHelpBotIndexUrl = base + '/sample-index.json';
-        var s = document.createElement('script');
-        s.src = base + '/scripts/elb-help-bot.js';
-        s.async = false;
-        (document.body || document.documentElement).appendChild(s);
-      })();
-    </script>
+    <!-- ELB Help Bot -->
+    <script src="/scripts/elb-help-bot-config.js"></script>
   </body>
 </html>
 
