@@ -1,5 +1,5 @@
 /**
- * ELB Help Bot — Config File (HTML / JavaScript) v3.13.0
+ * ELB Help Bot — Config File (HTML / JavaScript) v3.16.0
  *
  * COPY THIS FILE to your application. EDIT ONLY THESE VALUES.
  * No other changes needed.
@@ -7,7 +7,7 @@
  * Add this line before </body> in your HTML:
  *   <script src="path/to/elb-help-bot-config.js"></script>
  *
- * ALL v3.13 features (redesigned Quick Actions card UI with Community
+ * ALL v3.16 features (query-isolated product-priority search, sticky starred sections,
  * "New Post" direct link to topics/create, product Quick Start Guides
  * with tag badges, built-in content index, zero-config auto-discovery,
  * flicker-free rendering, spell correction, TF-IDF semantic search,

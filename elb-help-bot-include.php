@@ -1,6 +1,6 @@
 <?php
 /**
- * ELB Help Bot — Include File v3.13.0
+ * ELB Help Bot — Include File v3.16.0
  *
  * COPY THIS FILE AS-IS. No edits needed.
  * It reads product name and URL from elb-help-bot-config.php (edit that file only).
@@ -8,7 +8,7 @@
  * Add this line before </body> in your dashboard/layout:
  *   <?php require_once __DIR__ . '/elb-help-bot-include.php'; ?>
  *
- * ALL v3.13 features are automatically available. The content index is
+ * ALL v3.16 features are automatically available. The content index is
  * built into elb-help-bot.js — no external index file needed.
  */
 
@@ -27,7 +27,7 @@ if ( $elb_help_bot_show && ! empty( $elb_help_bot_script_url ) ) {
 	$product    = htmlspecialchars( $elb_help_bot_product, ENT_QUOTES, 'UTF-8' );
 	$script_url = htmlspecialchars( $elb_help_bot_script_url, ENT_QUOTES, 'UTF-8' );
 ?>
-<!-- ELB Help Bot v3.13 — Redesigned Quick Actions, product guides with tags, built-in index, precision retrieval -->
+<!-- ELB Help Bot v3.16 — Acronym-aware search, balanced UI, draggable panel, built-in index, precision retrieval -->
 <script>
 window.productContext = { product: "<?php echo $product; ?>" };
 <?php if ( ! empty( $elb_help_bot_config_url ) ) : ?>window.elbHelpBotConfigUrl = "<?php echo htmlspecialchars( $elb_help_bot_config_url, ENT_QUOTES, 'UTF-8' ); ?>";<?php endif; ?>
