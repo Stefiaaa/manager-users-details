@@ -26,12 +26,12 @@
 
   // ==================== EDIT THESE VALUES ====================
   var product   = 'general';   // Your product: lectora, cenariovr, training-arcade, microbuilder, rockstar, rehearsal, coursemill, reviewlink, learning-creation-studio, general
-  var scriptUrl = 'http://localhost/Manager_users_details/scripts/elb-help-bot.js';   // Full URL where you uploaded elb-help-bot.js
+  var scriptUrl = '/scripts/elb-help-bot.js';   // Same-origin path — works when deployed (Netlify, etc.) and locally
   // ============================================================
 
   // Optional — set if Admin gave you these URLs (leave empty if not):
   var configUrl    = '';   // Theme & product overrides JSON
-  var indexUrl     = '';   // Content index JSON — REQUIRED for precision retrieval (TF-IDF, paragraph anchoring, highlighting, RL, result validation)
+  var indexUrl     = '/sample-index.json';   // Content index — enables paragraph-level search, deep linking, relevance scoring
   var analyticsUrl = '';   // POST endpoint for query analytics
   var debugMode    = false;   // Set to true to enable debug pipeline logging in browser console
 
