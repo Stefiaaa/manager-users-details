@@ -18,7 +18,7 @@
   // ==================== EDIT THESE VALUES ====================
 
   var product   = 'general';           // Your product slug (see INSTRUCTIONS.md for the full list)
-  var scriptUrl = 'http://localhost/Manager_users_details/scripts/elb-help-bot.js';   // Path to elb-help-bot.js (change if it is in a different folder)
+  var scriptUrl = '/scripts/elb-help-bot.js';   // Path to elb-help-bot.js (relative path works for both local and deployed)
 
   // ============================================================
 
