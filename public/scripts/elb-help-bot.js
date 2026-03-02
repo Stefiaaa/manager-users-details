@@ -1,22 +1,69 @@
 /**
- * ELB Help Bot — Precision Retrieval Engine v3.16.0
- * In-product conversational assistant: KB + Community + Product support.
+ * ELB Assistant — Precision Retrieval Engine v4.4.0
+ * In-product knowledge assistant: KB + Community + Product support.
+ *
+ * v4.4.0 — Search Recall & Layout Fixes:
+ *   - Keyword expansion: single-s-removal variant added alongside stem to fix
+ *     plural queries (e.g. "arcades" now correctly produces "arcade" keyword,
+ *     enabling synonym lookup and exact word matching)
+ *   - Derivative match scoring improved from 0.35 to 0.55 multiplier to prevent
+ *     valid partial matches from being scored too low
+ *   - Non-exact-signal penalty relaxed from 0.52 to 0.72 to prevent aggressive
+ *     suppression of derivative/synonym matches when exact hits exist
+ *   - Loose fallback scoring ceiling raised for better recall recovery
+ *   - Index: "arcade" synonym group added, Training Arcade articles tagged
+ *   - Panel whitespace fix: height:fit-content on panel, accordion body
+ *     max-height reduced from 3200px to 800px
+ *   - All welcome sections confirmed collapsed by default on initial load
+ *
+ * v4.3.0 — Refined UI/UX Alignment & Layout Consistency:
+ *   - Quick Actions & Quick Guides in search results now render in a true
+ *     horizontal 2-column layout using CSS grid, structurally matching the
+ *     presentation style of KB Articles & Community Posts sections
+ *   - All section headers (Quick Actions, Quick Guides, KB, Community,
+ *     Recent Searches) now share identical styling, padding, and count badge
+ *   - Floating toggle icon enlarged to 76px with enhanced multi-stop gradient,
+ *     3px white border, 34px SVG icon, improved green pulse animation
+ *   - Panel fully separated from toggle: bottom:120px, 440px width, 20px radius
+ *   - Welcome message area non-truncating: proper flex layout with min-height
+ *   - Optimized vertical spacing: reduced gap between sections (8px),
+ *     tighter accordion body margins, result cards with 10px gap
+ *   - Horizontal spacing balanced: body padding 16px, section labels 12px 14px
+ *   - View tabs: tighter gap (4px), pill-shaped with consistent active state
+ *   - Search bar: 48px min-height, 14px font, icon scales on focus
+ *   - Responsive: 480px breakpoint stacks resource grid to single column,
+ *     toggle 64px, panel full-width with 16px radius
+ *   - 768px breakpoint: toggle 68px, panel bottom:112px
+ *
+ * v4.2.0 — Enhanced UI/UX + Polished Visual Design:
+ *   - Custom scrollbar styling on body, resource rows, and masonry layouts
+ *   - Result cards: increased padding, 12px border-radius, 1.5px borders
+ *   - Suggest buttons: hover lift effect, subtle shadow
+ *   - All info panels (spell, error, warning, no-match, low-conf): 12px radius
+ *   - Footer: subtle background tint (#fafaf8)
+ *
+ * v4.1.0 — Robust Acronym Recognition + Compact Balanced UI:
+ *   - CRITICAL FIX: expandAcronyms() rewritten to use word-level splitting
+ *     instead of regex with global flag. Each whitespace-delimited word is
+ *     checked against _ACRONYM_MAP directly — no regex lastIndex issues,
+ *     no silent misses. "getting started RLP" now reliably expands to
+ *     "getting started rockstar learning platform".
+ *   - CRITICAL FIX: Spell corrector (suggestCorrection) now skips known
+ *     acronyms via isKnownAcronym() guard. Previously "rlp" could be
+ *     incorrectly "corrected" to "elb" by Levenshtein distance. All
+ *     _ACRONYM_MAP keys are now immune to spell correction interference.
+ *   - getSpellingSuggestions() also skips acronyms in keyword list.
+ *   - _ACRONYM_MAP expanded: added rslp, tlcs, cml, tta, lo, ld, vr.
+ *   - _PRODUCT_ALIASES expanded: added cm, cml, lo, ld, cvr, ta, tta,
+ *     mb, rl, rslp, rp, tlcs for comprehensive acronym-to-product mapping.
+ *   - Welcome screen Quick Actions and Quick Guides now render in compact
+ *     inline mode to reduce vertical footprint and keep KB/Community
+ *     results visible without excessive scrolling.
+ *   - Section balance improved: result view Quick Actions collapsed by
+ *     default with compact pill toggles; KB and Community sections
+ *     always expanded and prominently visible.
  *
  * v3.16.0 — Acronym-Aware Search + Balanced UI + Draggable Panel:
- *   - CRITICAL FIX: expandAcronyms() regex lastIndex bug resolved.
- *     The global-flag regex used test() before replace(), which advanced
- *     lastIndex and caused replace() to silently skip the match.
- *     Acronyms like RLP, LCS, CM are now reliably expanded.
- *   - Expanded _ACRONYM_MAP with additional aliases (e.g. elb, ta, cm, rp).
- *   - _PRODUCT_ALIASES expanded with more patterns for reliable detection.
- *   - detectProductFromQuery() now also checks pre-expanded acronyms as
- *     a fallback, ensuring "getting started RLP" correctly maps to Rockstar.
- *   - Starred sections on search results now use a single compact row with
- *     inline action buttons. Quick Start Guides show as a collapsible
- *     sub-section with max-height constraint, preventing them from pushing
- *     KB and Community results below the fold.
- *   - Section labels for KB, Community, and Starred are visually distinct
- *     with icon badges and separator lines for balanced visibility.
  *   - Panel is now fully draggable via the header bar (grab to move).
  *     Users can reposition the chatbot panel anywhere on screen.
  *     Position persists in localStorage across page visits.
@@ -51,7 +98,7 @@
  *     positioned alongside KB and Community references
  *   - Validation: postNewQuestion URL validated against allowlist, guide
  *     URLs validated, empty instruction arrays handled gracefully
- *   - buildStarredSection() rewritten with new card-based DOM structure
+ *   - Quick Actions and Quick Guides now render as independent IA sections
  *   - CSS: .zikb-qa-card, .zikb-qa-header, .zikb-qa-links, .zikb-guide-card,
  *     .zikb-guide-header, .zikb-guide-item with modern design tokens
  *
@@ -269,21 +316,22 @@
  *     transposition, QWERTY keyboard proximity, double-letter patterns.
  *
  * Zero dependencies. Single vanilla JS file. Any tech stack.
- * @version 3.16.0
+ * @version 4.3.0
  */
 (function () {
   'use strict';
 
-  var VERSION = '3.16.0';
+  var VERSION = '4.4.0';
   var MAX_QUERY_LENGTH = 200;
   var MAX_RESULTS = 10;
   var HIGH_CONFIDENCE = 0.80;
   var MEDIUM_CONFIDENCE = 0.50;
   var MIN_RENDER_THRESHOLD = 0.01;
-  var SNIPPET_RADIUS = 90;
+  var SNIPPET_RADIUS = 140;
   var POS_STORAGE_KEY = 'elb-help-bot-position';
   var PANEL_STATE_KEY = 'elb-help-bot-panel-open';
   var HISTORY_KEY = 'elb-help-bot-history';
+  var QUICK_GUIDE_USAGE_KEY = 'elb-help-bot-guide-usage';
   var RL_KEY = 'elb-help-bot-rl';
   var INDEX_CACHE_KEY = 'elb-help-bot-index-cache';
   var MAX_HISTORY = 20;
@@ -313,41 +361,52 @@
   };
 
   var PRODUCT_INSTRUCTIONS = {
-    lectora:           [{ label: 'Getting Started: Training Plan',     url: KB_BASE + '/lectora-training-plan-everything-you-need-to-know', tag: 'Essentials' },
-                        { label: 'Lectora & PowerPoint Quick Guide',   url: KB_BASE + '/lectora-and-powerpoint-start-here', tag: 'Quick Start' },
-                        { label: 'Responsive Course Design (RCD)',     url: KB_BASE + '/responsive-course-design-in-lectora', tag: 'Design' },
-                        { label: 'Publishing & SCORM',                 url: KB_BASE + '/publish-in-lectora', tag: 'Publishing' }],
-    cenariovr:         [{ label: 'Getting Started: CenarioVR',         url: KB_BASE + '/cenariovr-getting-started', tag: 'Essentials' },
-                        { label: '360° Video Best Practices',          url: KB_BASE + '/cenariovr-360-video', tag: 'Content' }],
-    'training-arcade': [{ label: 'Step-by-Step Game Tutorials',        url: KB_BASE + '/learn-how-to-build-effective-training-games', tag: 'Tutorials' },
-                        { label: 'Game Template Gallery',              url: KB_BASE + '/the-training-arcade-game-list', tag: 'Templates' }],
-    microbuilder:      [{ label: 'Create a Microlearning Module',      url: KB_BASE + '/how-to-create-a-microlearning-module-in-microbuilder', tag: 'Quick Start' }],
-    rockstar:          [{ label: 'Getting Started: Rockstar Platform', url: KB_BASE + '/guide-to-getting-started-with-knowledgelink', tag: 'Essentials' }],
-    reviewlink:        [{ label: 'Getting Started with ReviewLink',    url: KB_BASE + '/getting-started-with-reviewlink', tag: 'Quick Start' }],
-    coursemill:         [{ label: 'Getting Started with CourseMill',    url: KB_BASE + '/getting-started-with-coursemill', tag: 'Essentials' },
-                        { label: 'CourseMill Student UI Overview',     url: KB_BASE + '/coursemill-student-ui-overview', tag: 'Students' },
-                        { label: 'CourseMill Administrator Guide',     url: KB_BASE + '/coursemill-administrator-guide', tag: 'Admin' }],
-    rehearsal:         [{ label: 'Rehearsal Getting Started',          url: KB_BASE + '/rehearsal', tag: 'Quick Start' }],
-    general:           [{ label: 'Lectora Online Release Notes',       url: KB_BASE + '/lectora-online-release-notes', tag: 'Updates' },
-                        { label: 'Submit a Support Case',              url: KB_BASE + '/submit-a-case-to-customer-solutions', tag: 'Support' }]
+    lectora:           [{ label: 'Getting Started: Training Plan',     url: KB_BASE + '/lectora-training-plan-everything-you-need-to-know?hsLang=en', tag: 'Essentials' },
+                        { label: 'Lectora & PowerPoint Quick Guide',   url: KB_BASE + '/lectora-and-powerpoint-start-here?hsLang=en', tag: 'Quick Start' },
+                        { label: 'Responsive Course Design (RCD)',     url: KB_BASE + '/responsive-course-design-in-lectora?hsLang=en', tag: 'Design' },
+                        { label: 'Publishing (SCORM, AICC, HTML)',     url: KB_BASE + '/19.-publishing-scorm-aicc-html?hsLang=en', tag: 'Publishing' }],
+    cenariovr:         [{ label: 'Getting Started: CenarioVR',         url: KB_BASE + '/cenariovr-getting-started?hsLang=en', tag: 'Essentials' },
+                        { label: '360° Video Best Practices',          url: KB_BASE + '/best-practices-for-creating-360-degree-video?hsLang=en', tag: 'Content' },
+                        { label: 'Navigating CenarioVR Dashboard',    url: KB_BASE + '/navigating-cenariovrs-dashboard?hsLang=en', tag: 'Quick Start' }],
+    'training-arcade': [{ label: 'Step-by-Step Game Tutorials',        url: KB_BASE + '/learn-how-to-build-effective-training-games?hsLang=en', tag: 'Tutorials' },
+                        { label: 'Game Overview Videos',               url: KB_BASE + '/game-videos?hsLang=en', tag: 'Resources' },
+                        { label: 'Adding Games to Your LMS',           url: KB_BASE + '/how-do-i-add-the-training-arcade-games-to-my-lms?hsLang=en', tag: 'LMS' }],
+    microbuilder:      [{ label: 'Create a Microlearning Module',      url: KB_BASE + '/how-to-create-a-microlearning-module-in-microbuilder?hsLang=en', tag: 'Quick Start' },
+                        { label: 'AI-Assisted Content Generation',     url: KB_BASE + '/ai-assisted-content-generation-in-microbuilder?hsLang=en', tag: 'AI' },
+                        { label: 'Publish Your Module',                url: KB_BASE + '/publish-your-microlearning-module-in-microbuilder?hsLang=en', tag: 'Publishing' }],
+    rockstar:          [{ label: 'Getting Started: Rockstar Platform', url: KB_BASE + '/guide-to-getting-started-with-knowledgelink?hsLang=en', tag: 'Essentials' },
+                        { label: 'Navigating the Module Page',         url: KB_BASE + '/module-page?hsLang=en', tag: 'Quick Start' }],
+    reviewlink:        [{ label: 'Getting Started with ReviewLink',    url: KB_BASE + '/getting-started-with-reviewlink?hsLang=en', tag: 'Quick Start' },
+                        { label: 'ReviewLink Training Plan',           url: KB_BASE + '/reviewlink-training-plan-everything-you-need-to-know?hsLang=en', tag: 'Essentials' },
+                        { label: 'ReviewLink Markup Tools',            url: KB_BASE + '/reviewlink-markup-1?hsLang=en', tag: 'Tools' }],
+    coursemill:         [{ label: 'Getting Started with CourseMill',    url: KB_BASE + '/getting-started-with-coursemill?hsLang=en', tag: 'Essentials' },
+                        { label: 'CourseMill Student UI Overview',     url: KB_BASE + '/coursemill-student-ui-overview?hsLang=en', tag: 'Students' },
+                        { label: 'CourseMill Administrator Guide',     url: KB_BASE + '/coursemill-administrator-guide?hsLang=en', tag: 'Admin' }],
+    rehearsal:         [{ label: 'Rehearsal Knowledge Base',           url: KB_BASE + '/rehearsal-knowledge-base?hsLang=en', tag: 'Quick Start' },
+                        { label: 'Rehearsal Administration',           url: KB_BASE + '/rehearsal-platform-administration?hsLang=en', tag: 'Admin' },
+                        { label: 'Rehearsal Mentoring',                url: KB_BASE + '/rehearsal-mentoring?hsLang=en', tag: 'Mentoring' }],
+    'learning-creation-studio': [{ label: 'Learning Creation Studio Overview', url: KB_BASE + '/the-learning-creation-studio?hsLang=en', tag: 'Essentials' }],
+    general:           [{ label: 'Release Notes for All Software',     url: KB_BASE + '/release-notes-for-all-software?hsLang=en', tag: 'Updates' },
+                        { label: 'Submit a Support Case',              url: KB_BASE + '/submit-a-case-to-customer-solutions?hsLang=en', tag: 'Support' },
+                        { label: 'Art & Science of E-Learning',        url: KB_BASE + '/art-science-of-e-learning?hsLang=en', tag: 'Best Practices' }]
   };
 
   var STOP_WORDS = ['a','an','the','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','could','should','may','might','must','shall','can','need','dare','to','of','in','for','on','with','at','by','from','as','into','through','during','before','after','above','below','i','me','my','we','our','you','your','it','its','they','them','their','what','which','who','how','when','where','why','not','no','so','if','or','and','but','then','than','too','very','just','about','also','only'];
 
   /* =================== BUILT-IN INDEX (zero-config fallback) =================== */
-  var _BUILTIN_INDEX = {"version":"3.16.0","updatedAt":"2026-02-21T00:00:00Z","synonyms":{"publish":["export","deploy","release","output","generate"],"error":["bug","issue","problem","crash","failure","broken"],"install":["setup","configure","download","deploy"],"create":["build","make","add","new","generate","author"],"course":["module","lesson","training","content","curriculum"],"quiz":["test","assessment","exam","evaluation"],"report":["analytics","statistics","data","metrics","dashboard"],"scorm":["xapi","tincan","cmi5","aicc","package"],"responsive":["mobile","adaptive","flexible","rcd"],"variable":["parameter","field","value","token"],"template":["layout","theme","design","preset"],"user":["student","learner","participant","member","account"],"vr":["virtual reality","immersive","360","headset"],"game":["gamification","arcade","interactive","engagement"]},"weightConfig":{"titleExact":100,"titlePartial":60,"titleFuzzy":35,"headingExact":50,"headingPartial":30,"headingFuzzy":18,"bodyExact":40,"bodyPartial":25,"bodyFuzzy":12,"paragraphExact":45,"paragraphPartial":28,"paragraphFuzzy":14,"synonymMatch":0.7,"solvedBoost":30,"acceptedBoost":20,"recencyDays":365,"recencyWeight":10,"tagMatch":15,"productMatch":20,"semanticWeight":30,"rlWeight":1.0},"confidenceConfig":{"high":0.80,"medium":0.50,"minRenderThreshold":0.01,"maxResults":10},"articles":[{"id":"kb-lectora-001","type":"kb","product":"lectora","title":"Getting Started: Lectora Training Plan","url":"https://knowledgebase.elblearning.com/lectora-training-plan-everything-you-need-to-know","body":"Everything you need to know to get started with Lectora. This training plan covers installation, setup, course creation, publishing, and advanced features. Follow the step-by-step guide to build your first eLearning course.","sections":[{"heading":"Installation & Setup","anchor":"installation-setup","text":"Download Lectora Desktop from the ELB Learning website. Run the installer and follow the on-screen prompts. Enter your license key when prompted. For Lectora Online, sign in at lectora.com with your ELB Learning credentials.","level":2,"paragraphs":[{"text":"Download Lectora Desktop from the ELB Learning website. Run the installer and follow the on-screen prompts.","anchor":"installation-setup-p0"},{"text":"Enter your license key when prompted. For Lectora Online, sign in at lectora.com with your ELB Learning credentials.","anchor":"installation-setup-p1"}]},{"heading":"Creating Your First Course","anchor":"creating-your-first-course","text":"Start a new project by selecting File > New. Choose a template or start from scratch. Add pages, chapters, and sections. Insert text blocks, images, audio, and video. Configure navigation and transitions.","level":2,"paragraphs":[{"text":"Start a new project by selecting File > New. Choose a template or start from scratch.","anchor":"creating-your-first-course-p0"},{"text":"Add pages, chapters, and sections. Insert text blocks, images, audio, and video.","anchor":"creating-your-first-course-p1"},{"text":"Configure navigation and transitions between pages for a smooth learner experience.","anchor":"creating-your-first-course-p2"}]},{"heading":"Publishing Options","anchor":"publishing-options","text":"Publish your course for different platforms. Choose SCORM 1.2, SCORM 2004, xAPI (Tin Can), AICC, or HTML5. Set output options including responsive design. Select the target LMS and configure tracking settings. Export the package and upload to your LMS.","level":2,"paragraphs":[{"text":"Publish your course for different platforms. Choose SCORM 1.2, SCORM 2004, xAPI (Tin Can), AICC, or HTML5.","anchor":"publishing-options-p0"},{"text":"Set output options including responsive design. Select the target LMS and configure tracking settings.","anchor":"publishing-options-p1"},{"text":"Export the package and upload to your LMS. Verify tracking data is correctly sent by launching the course in your LMS and completing a test run.","anchor":"publishing-options-p2"}]},{"heading":"Variables and Actions","anchor":"variables-and-actions","text":"Use variables to store and track learner data. Create custom variables for scores, completion status, and user input. Set up actions triggered by events like button clicks, page load, or timer completion. Use conditions to create branching scenarios.","level":2,"paragraphs":[{"text":"Use variables to store and track learner data. Create custom variables for scores, completion status, and user input.","anchor":"variables-and-actions-p0"},{"text":"Set up actions triggered by events like button clicks, page load, or timer completion. Use conditions to create branching scenarios.","anchor":"variables-and-actions-p1"}]}],"tags":["getting-started","training-plan","installation","publishing","variables"],"solved":false,"updatedAt":"2026-02-15"},{"id":"kb-lectora-002","type":"kb","product":"lectora","title":"Quick Guide: Lectora and PowerPoint","url":"https://knowledgebase.elblearning.com/lectora-and-powerpoint-start-here","body":"Convert PowerPoint presentations to interactive Lectora courses. Import slides, preserve animations, add interactivity, and publish as eLearning content.","sections":[{"heading":"Importing PowerPoint","anchor":"importing-powerpoint","text":"Go to File > Import > PowerPoint. Select your .pptx file. Choose import options: preserve layout, import animations, maintain slide order. The importer converts each slide to a Lectora page.","level":2,"paragraphs":[{"text":"Go to File > Import > PowerPoint. Select your .pptx file.","anchor":"importing-powerpoint-p0"},{"text":"Choose import options: preserve layout, import animations, maintain slide order. The importer converts each slide to a Lectora page.","anchor":"importing-powerpoint-p1"}]},{"heading":"Adding Interactivity","anchor":"adding-interactivity","text":"After import, enhance slides with Lectora interactivity. Add buttons, quiz questions, drag-and-drop interactions, and clickable hotspots. Use actions and triggers to control navigation flow.","level":2,"paragraphs":[{"text":"After import, enhance slides with Lectora interactivity. Add buttons, quiz questions, drag-and-drop interactions, and clickable hotspots.","anchor":"adding-interactivity-p0"},{"text":"Use actions and triggers to control navigation flow between slides and interactive elements.","anchor":"adding-interactivity-p1"}]}],"tags":["powerpoint","import","conversion","slides"],"solved":false,"updatedAt":"2026-02-10"},{"id":"kb-lectora-003","type":"kb","product":"lectora","title":"Responsive Course Design (RCD) in Lectora","url":"https://knowledgebase.elblearning.com/responsive-course-design-in-lectora","body":"Build mobile-responsive courses that adapt to any screen size. Lectora's Responsive Course Design (RCD) automatically adjusts layout for desktop, tablet, and mobile devices.","sections":[{"heading":"Enabling RCD","anchor":"enabling-rcd","text":"When creating a new title, select Responsive Design. This enables the responsive grid system. Content automatically reflows based on device width. You can also convert existing courses to responsive layout.","level":2,"paragraphs":[{"text":"When creating a new title, select Responsive Design. This enables the responsive grid system.","anchor":"enabling-rcd-p0"},{"text":"Content automatically reflows based on device width. You can also convert existing courses to responsive layout.","anchor":"enabling-rcd-p1"}]},{"heading":"Breakpoints and Layouts","anchor":"breakpoints-and-layouts","text":"RCD uses three default breakpoints: Desktop (1024px+), Tablet (768px), and Mobile (480px). Customize breakpoints in project settings. Each breakpoint can have a different layout. Use the device preview toolbar to test each view.","level":2,"paragraphs":[{"text":"RCD uses three default breakpoints: Desktop (1024px+), Tablet (768px), and Mobile (480px). Customize breakpoints in project settings.","anchor":"breakpoints-and-layouts-p0"},{"text":"Each breakpoint can have a different layout. Use the device preview toolbar to test each view.","anchor":"breakpoints-and-layouts-p1"}]},{"heading":"Mobile-Specific Settings","anchor":"mobile-specific-settings","text":"Configure touch-friendly button sizes for mobile. Adjust font sizes and spacing. Enable swipe navigation. Test gesture interactions. Ensure accessibility compliance on all devices.","level":2,"paragraphs":[{"text":"Configure touch-friendly button sizes for mobile. Adjust font sizes and spacing.","anchor":"mobile-specific-settings-p0"},{"text":"Enable swipe navigation. Test gesture interactions. Ensure accessibility compliance on all devices.","anchor":"mobile-specific-settings-p1"}]}],"tags":["responsive","rcd","mobile","adaptive","layout"],"solved":false,"updatedAt":"2026-01-28"},{"id":"kb-cenariovr-001","type":"kb","product":"cenariovr","title":"Getting Started: CenarioVR","url":"https://knowledgebase.elblearning.com/cenariovr-getting-started","body":"Learn how to create immersive virtual reality learning experiences with CenarioVR. This guide covers 360-degree video, hotspots, branching scenarios, and publishing for VR headsets.","sections":[{"heading":"Dashboard Overview","anchor":"dashboard-overview","text":"The CenarioVR dashboard shows your projects, templates, and recent activity. Create a new scenario from the dashboard. Browse the template library for pre-built VR experiences. Manage team members and sharing settings.","level":2,"paragraphs":[{"text":"The CenarioVR dashboard shows your projects, templates, and recent activity.","anchor":"dashboard-overview-p0"},{"text":"Create a new scenario from the dashboard. Browse the template library for pre-built VR experiences. Manage team members and sharing settings.","anchor":"dashboard-overview-p1"}]},{"heading":"Adding 360 Content","anchor":"adding-360-content","text":"Upload 360-degree photos or videos as scene backgrounds. Supported formats include equirectangular JPG, PNG, and MP4. Add interactive hotspots, text overlays, and navigation waypoints. Create branching paths between scenes.","level":2,"paragraphs":[{"text":"Upload 360-degree photos or videos as scene backgrounds. Supported formats include equirectangular JPG, PNG, and MP4.","anchor":"adding-360-content-p0"},{"text":"Add interactive hotspots, text overlays, and navigation waypoints. Create branching paths between scenes.","anchor":"adding-360-content-p1"}]},{"heading":"Publishing for VR","anchor":"publishing-for-vr","text":"Publish your CenarioVR experience for web browsers, Oculus Quest, HTC Vive, or mobile VR. Generate a shareable link or SCORM package for LMS integration. Configure quality settings and loading screens.","level":2,"paragraphs":[{"text":"Publish your CenarioVR experience for web browsers, Oculus Quest, HTC Vive, or mobile VR.","anchor":"publishing-for-vr-p0"},{"text":"Generate a shareable link or SCORM package for LMS integration. Configure quality settings and loading screens.","anchor":"publishing-for-vr-p1"}]}],"tags":["getting-started","vr","360","immersive","headset"],"solved":false,"updatedAt":"2026-02-05"},{"id":"kb-training-arcade-001","type":"kb","product":"training-arcade","title":"Step-by-Step Tutorials: The Training Arcade","url":"https://knowledgebase.elblearning.com/learn-how-to-build-effective-training-games","body":"Create engaging training games with The Training Arcade. Choose from multiple game templates including trivia, word search, flashcards, and more. Customize content, branding, and difficulty levels.","sections":[{"heading":"Choosing a Game Template","anchor":"choosing-a-game-template","text":"Browse the game library to select a template. Options include Jeopardy-style trivia, memory match, word search, spin the wheel, and flashcards. Each template is fully customizable with your training content.","level":2},{"heading":"Adding Content to Games","anchor":"adding-content-to-games","text":"Enter questions, answers, and feedback for each game. Support for text, images, audio, and video. Set correct answers and point values. Configure difficulty levels and time limits.","level":2},{"heading":"Publishing and LMS Integration","anchor":"publishing-and-lms-integration","text":"Export games as SCORM packages for LMS tracking. Generate shareable web links. Embed games directly in websites using iframe code. Track completion and scores through your LMS.","level":2}],"tags":["games","gamification","trivia","engagement","tutorial"],"solved":false,"updatedAt":"2026-02-01"},{"id":"kb-microbuilder-001","type":"kb","product":"microbuilder","title":"How To Create a Microlearning Module in MicroBuilder","url":"https://knowledgebase.elblearning.com/how-to-create-a-microlearning-module-in-microbuilder","body":"Build bite-sized learning modules quickly with MicroBuilder. The easy-to-use authoring tool lets you create microlearning content without technical skills.","sections":[{"heading":"Creating a New Module","anchor":"creating-a-new-module","text":"Click Create New from the dashboard. Choose a layout template or start blank. Add content blocks: text, images, video, quizzes, and interactive elements. Drag and drop to reorder sections.","level":2},{"heading":"AI-Assisted Content Generation","anchor":"ai-assisted-content-generation","text":"Use MicroBuilder's AI assistant to generate learning content. Provide a topic or paste existing text. The AI creates structured microlearning modules with questions and key takeaways. Review and customize the generated content.","level":2},{"heading":"Publishing Your Module","anchor":"publishing-your-module","text":"Publish your microlearning module as a web link, SCORM package, or embed code. Share via email, Slack, or your LMS. Track engagement and completion analytics from the dashboard.","level":2}],"tags":["microlearning","authoring","ai","content-creation"],"solved":false,"updatedAt":"2026-02-18"},{"id":"kb-rockstar-001","type":"kb","product":"rockstar","title":"Guide to Getting Started with Rockstar Learning Platform","url":"https://knowledgebase.elblearning.com/guide-to-getting-started-with-knowledgelink","body":"Set up and configure the Rockstar Learning Platform for your organization. Manage users, courses, learning paths, and reporting.","sections":[{"heading":"User Management","anchor":"user-management","text":"Add users individually or via bulk CSV import. Set user roles: Admin, Manager, Instructor, Learner. Configure SSO integration with your identity provider. Manage groups and departments for targeted training assignments.","level":2,"paragraphs":[{"text":"Add users individually or via bulk CSV import. Set user roles: Admin, Manager, Instructor, Learner.","anchor":"user-management-p0"},{"text":"Configure SSO integration with your identity provider. Manage groups and departments for targeted training assignments.","anchor":"user-management-p1"}]},{"heading":"Course Assignment","anchor":"course-assignment","text":"Upload SCORM, xAPI, or video courses. Create learning paths with prerequisites. Assign courses to individuals, groups, or departments. Set due dates and send automated reminders.","level":2},{"heading":"Reports and Analytics","anchor":"reports-and-analytics","text":"View completion rates, scores, and engagement metrics. Generate custom reports by user, course, or department. Export data as CSV or PDF. Schedule automated report delivery via email.","level":2}],"tags":["lms","platform","users","reports","courses"],"solved":false,"updatedAt":"2026-01-20"},{"id":"comm-lectora-001","type":"community","product":"lectora","title":"The Return of the In-Person User Conference?","url":"https://community.elblearning.com/topics/the-return-of-the-inperson-user-conference-2fca939b?hsLang=en","body":"We've heard requests from some avid Lectora fans to bring back the Lectora User Conference (LUC). We hear you. But we want to do it right. We've grown a ton since the Trivantis days and have many more products. So, we'd like to know what you'd be willing to participate in.","tags":["lectora","conference","user-group","training","community"],"solved":false,"accepted":false,"replies":9,"views":345,"updatedAt":"2023-08-02"},{"id":"comm-lectora-002","type":"community","product":"lectora","title":"Join us for In-Person Training on Lectora","url":"https://community.elblearning.com/topics/join-us-for-inperson-training-on-lectora-82b10a16?hsLang=en","body":"Join us for hands-on, in-person training sessions on Lectora. Learn from experts, get certified, and connect with fellow Lectora users and eLearning professionals.","tags":["lectora","training","in-person","certification","workshop"],"solved":false,"accepted":false,"replies":0,"views":210,"updatedAt":"2023-06-16"},{"id":"comm-cenariovr-001","type":"community","product":"general","title":"ELB's new Community Web App","url":"https://community.elblearning.com/topics/elb39s-new-quotcommunityquot-web-app-d7785aa7?hsLang=en","body":"ELB Learning has launched a new Community web app for users to connect, ask questions, share knowledge, and meet fellow learners and educators. Get involved by signing in and exploring the diverse range of topics.","tags":["community","web-app","elb-learning","networking","discussion"],"solved":false,"accepted":false,"replies":16,"views":428,"updatedAt":"2023-07-26"},{"id":"comm-rockstar-001","type":"community","product":"general","title":"ELB Learning Wins Top Content Providers for Diversity And Inclusion Training","url":"https://community.elblearning.com/topics/elb-learning-is-number-4-for-top-content-providers-for-diversity-and-inclusion-training-ae6904f3?hsLang=en","body":"ELB Learning is number 4 for Top Content Providers for Diversity And Inclusion Training! This recognition highlights our commitment to creating impactful and inclusive learning experiences for organizations worldwide.","tags":["elb-learning","awards","diversity","inclusion","content-providers"],"solved":false,"accepted":false,"replies":0,"views":189,"updatedAt":"2023-05-12"},{"id":"comm-training-arcade-001","type":"community","product":"general","title":"ELB Learning wins 2022 Top Advanced Learning Technologies Companies List","url":"https://community.elblearning.com/topics/elb-learning-wins-2022-top-advanced-learning-technologies-companies-list-29ea4075?hsLang=en","body":"ELB Learning has been recognized on the 2022 Top Advanced Learning Technologies Companies List, showcasing our suite of innovative tools including Lectora, CenarioVR, The Training Arcade, and more.","tags":["elb-learning","awards","technology","recognition","learning-tools"],"solved":false,"accepted":false,"replies":0,"views":95,"updatedAt":"2022-10-31"},{"id":"kb-general-001","type":"kb","product":"lectora","title":"Lectora Online Release Notes","url":"https://knowledgebase.elblearning.com/lectora-online-release-notes","body":"Stay up to date with the latest features, improvements, and bug fixes for Lectora Online. Check release notes for new capabilities, enhancements, and resolved issues across recent versions.","sections":[{"heading":"Latest Releases","anchor":"latest-releases","text":"Check back regularly for the newest updates. Each product section below lists recent changes chronologically. Major updates include new features and significant improvements. Minor updates include bug fixes and performance enhancements.","level":2}],"tags":["release-notes","updates","changelog","versions"],"solved":false,"updatedAt":"2026-02-20"},{"id":"kb-reviewlink-001","type":"kb","product":"reviewlink","title":"Getting Started with ReviewLink","url":"https://knowledgebase.elblearning.com/getting-started-with-reviewlink","body":"ReviewLink streamlines the content review process. Upload your eLearning content, invite reviewers, collect feedback with inline annotations, and manage review cycles.","sections":[{"heading":"Uploading Content for Review","anchor":"uploading-content","text":"Upload SCORM packages, HTML5 content, or video files to ReviewLink. The platform renders your content in a browser-based viewer. Reviewers can navigate through the content and leave contextual feedback.","level":2},{"heading":"Markup and Annotations","anchor":"markup-and-annotations","text":"Reviewers can add markup directly on the content. Use text annotations, arrows, highlights, and stamps. Each comment is pinned to a specific location on the page. Authors receive notifications and can respond to each comment.","level":2}],"tags":["review","feedback","annotations","collaboration"],"solved":false,"updatedAt":"2026-01-25"},{"id":"kb-coursemill-001","type":"kb","product":"coursemill","title":"CourseMill Student UI Overview","url":"https://knowledgebase.elblearning.com/coursemill-student-ui-overview","body":"Navigate the CourseMill learning management system as a student. Access your assigned courses, track progress, view certificates, and manage your learning profile.","sections":[{"heading":"My Learning Dashboard","anchor":"my-learning-dashboard","text":"The dashboard displays your assigned courses, completion progress, and upcoming deadlines. Filter by status: Not Started, In Progress, or Completed. Click any course tile to launch the content.","level":2,"paragraphs":[{"text":"The dashboard displays your assigned courses, completion progress, and upcoming deadlines.","anchor":"my-learning-dashboard-p0"},{"text":"Filter by status: Not Started, In Progress, or Completed. Click any course tile to launch the content.","anchor":"my-learning-dashboard-p1"}]},{"heading":"Certificates and Transcripts","anchor":"certificates-and-transcripts","text":"After completing a course, access your certificate from the Completed section. Download or print certificates. View your full learning transcript with dates, scores, and completion status for all courses.","level":2,"paragraphs":[{"text":"After completing a course, access your certificate from the Completed section. Download or print certificates.","anchor":"certificates-and-transcripts-p0"},{"text":"View your full learning transcript with dates, scores, and completion status for all courses.","anchor":"certificates-and-transcripts-p1"}]}],"tags":["lms","student","dashboard","certificates","tracking","getting-started"],"solved":false,"updatedAt":"2026-01-15"},{"id":"kb-coursemill-002","type":"kb","product":"coursemill","title":"Getting Started with CourseMill LMS","url":"https://knowledgebase.elblearning.com/getting-started-with-coursemill","body":"Get started with CourseMill, the learning management system by ELB Learning. This guide covers initial setup, user creation, course uploading, assignment configuration, and reporting basics for CourseMill administrators.","sections":[{"heading":"Initial Setup and Configuration","anchor":"initial-setup-configuration","text":"Log in to the CourseMill admin console. Configure your organization settings including branding, default language, and notification preferences. Set up authentication methods: built-in credentials, LDAP, or SSO.","level":2,"paragraphs":[{"text":"Log in to the CourseMill admin console. Configure your organization settings including branding, default language, and notification preferences.","anchor":"initial-setup-configuration-p0"},{"text":"Set up authentication methods: built-in credentials, LDAP, or SSO.","anchor":"initial-setup-configuration-p1"}]},{"heading":"Managing Users and Groups","anchor":"managing-users-groups","text":"Create user accounts individually or import via CSV. Assign roles: Administrator, Manager, Instructor, or Learner. Organize users into groups and departments for targeted course assignments and reporting.","level":2,"paragraphs":[{"text":"Create user accounts individually or import via CSV. Assign roles: Administrator, Manager, Instructor, or Learner.","anchor":"managing-users-groups-p0"},{"text":"Organize users into groups and departments for targeted course assignments and reporting.","anchor":"managing-users-groups-p1"}]},{"heading":"Uploading and Assigning Courses","anchor":"uploading-assigning-courses","text":"Upload SCORM, AICC, or xAPI course packages to CourseMill. Create learning paths with prerequisites and deadlines. Assign courses to individuals, groups, or the entire organization. Configure enrollment rules and automated reminders.","level":2,"paragraphs":[{"text":"Upload SCORM, AICC, or xAPI course packages to CourseMill. Create learning paths with prerequisites and deadlines.","anchor":"uploading-assigning-courses-p0"},{"text":"Assign courses to individuals, groups, or the entire organization. Configure enrollment rules and automated reminders.","anchor":"uploading-assigning-courses-p1"}]},{"heading":"Reports and Compliance Tracking","anchor":"reports-compliance-tracking","text":"Generate detailed reports on learner progress, course completions, and compliance status. Schedule automated report delivery. Export data in CSV or PDF format for external analysis. Use the compliance dashboard to track mandatory training deadlines.","level":2,"paragraphs":[{"text":"Generate detailed reports on learner progress, course completions, and compliance status. Schedule automated report delivery.","anchor":"reports-compliance-tracking-p0"},{"text":"Export data in CSV or PDF format for external analysis. Use the compliance dashboard to track mandatory training deadlines.","anchor":"reports-compliance-tracking-p1"}]}],"tags":["getting-started","lms","setup","admin","courses","users","reports","coursemill"],"solved":false,"updatedAt":"2026-02-18"},{"id":"kb-coursemill-003","type":"kb","product":"coursemill","title":"CourseMill Administrator Guide","url":"https://knowledgebase.elblearning.com/coursemill-administrator-guide","body":"Comprehensive guide for CourseMill administrators covering system configuration, user management, course catalog setup, compliance tracking, and advanced reporting features.","sections":[{"heading":"System Configuration","anchor":"system-configuration","text":"Access the CourseMill admin panel to configure global settings. Manage email templates for notifications. Set password policies and session timeouts. Configure integration with external systems via API.","level":2,"paragraphs":[{"text":"Access the CourseMill admin panel to configure global settings. Manage email templates for notifications.","anchor":"system-configuration-p0"},{"text":"Set password policies and session timeouts. Configure integration with external systems via API.","anchor":"system-configuration-p1"}]},{"heading":"Course Catalog Management","anchor":"course-catalog-management","text":"Organize courses into categories and catalogs. Set course visibility and enrollment rules. Enable self-enrollment or restrict to admin-assigned only. Manage course versioning and retirement.","level":2,"paragraphs":[{"text":"Organize courses into categories and catalogs. Set course visibility and enrollment rules.","anchor":"course-catalog-management-p0"},{"text":"Enable self-enrollment or restrict to admin-assigned only. Manage course versioning and retirement.","anchor":"course-catalog-management-p1"}]}],"tags":["admin","configuration","lms","catalog","management","coursemill"],"solved":false,"updatedAt":"2026-02-10"},{"id":"kb-lectora-004","type":"kb","product":"lectora","title":"Status Action Conditions","url":"https://knowledgebase.elblearning.com/status-action-conditions","body":"Learn how to use status action conditions in Lectora to control course behavior based on completion states. Configure actions that fire only when specific conditions related to question status, page status, or variable values are met.","sections":[{"heading":"Understanding Status Conditions","anchor":"understanding-status-conditions","text":"Status conditions evaluate the state of an object before executing an action. Common conditions include checking whether a page has been visited, a test has been passed, or a specific variable has reached a threshold value.","level":2,"paragraphs":[{"text":"Status conditions evaluate the state of an object before executing an action.","anchor":"understanding-status-conditions-p0"},{"text":"Common conditions include checking whether a page has been visited, a test has been passed, or a specific variable has reached a threshold value.","anchor":"understanding-status-conditions-p1"}]},{"heading":"Configuring Action Conditions","anchor":"configuring-action-conditions","text":"Add conditions to any action by opening the Action Properties panel. Click Add Condition to define the evaluation criteria. Combine multiple conditions using AND/OR logic. Test your conditions in preview mode to verify correct behavior.","level":2,"paragraphs":[{"text":"Add conditions to any action by opening the Action Properties panel. Click Add Condition to define the evaluation criteria.","anchor":"configuring-action-conditions-p0"},{"text":"Combine multiple conditions using AND/OR logic. Test your conditions in preview mode to verify correct behavior.","anchor":"configuring-action-conditions-p1"}]}],"tags":["actions","conditions","variables","status","branching"],"solved":false,"updatedAt":"2026-02-10"},{"id":"kb-lectora-005","type":"kb","product":"lectora","title":"Trigger: Device Rotation and Variable: Current View","url":"https://knowledgebase.elblearning.com/trigger-device-rotation-and-variable-current-view","body":"Use the Device Rotation trigger and Current View variable in Lectora to create responsive interactions that adapt when a learner rotates their device between portrait and landscape orientations.","sections":[{"heading":"Device Rotation Trigger","anchor":"device-rotation-trigger","text":"The Device Rotation trigger fires automatically when the learner rotates their mobile device or tablet. Attach actions to this trigger to rearrange content, show or hide elements, or change layouts when orientation changes.","level":2,"paragraphs":[{"text":"The Device Rotation trigger fires automatically when the learner rotates their mobile device or tablet.","anchor":"device-rotation-trigger-p0"},{"text":"Attach actions to this trigger to rearrange content, show or hide elements, or change layouts when orientation changes.","anchor":"device-rotation-trigger-p1"}]},{"heading":"Current View Variable","anchor":"current-view-variable","text":"The Current View system variable stores the active responsive view name (Desktop, Tablet, or Mobile). Use this variable in conditions to execute actions only for specific device views. Combine with the Device Rotation trigger for full responsive control.","level":2,"paragraphs":[{"text":"The Current View system variable stores the active responsive view name (Desktop, Tablet, or Mobile).","anchor":"current-view-variable-p0"},{"text":"Use this variable in conditions to execute actions only for specific device views. Combine with the Device Rotation trigger for full responsive control.","anchor":"current-view-variable-p1"}]}],"tags":["trigger","device-rotation","variable","current-view","responsive","mobile"],"solved":false,"updatedAt":"2026-01-30"},{"id":"kb-lectora-006","type":"kb","product":"lectora","title":"Inline Variable Replacement","url":"https://knowledgebase.elblearning.com/inline-variable-replacement","body":"Display dynamic variable values directly within text blocks in Lectora. Use inline variable replacement to personalize content by showing the learner's name, score, date, or any custom variable value inside text elements.","sections":[{"heading":"Inserting a Variable into Text","anchor":"inserting-variable-into-text","text":"Place your cursor inside a text block where you want the variable value to appear. Go to Insert > Variable Reference or type the variable name wrapped in the designated tokens. At runtime the token is replaced with the current variable value.","level":2,"paragraphs":[{"text":"Place your cursor inside a text block where you want the variable value to appear.","anchor":"inserting-variable-into-text-p0"},{"text":"Go to Insert > Variable Reference or type the variable name wrapped in the designated tokens. At runtime the token is replaced with the current variable value.","anchor":"inserting-variable-into-text-p1"}]},{"heading":"Common Use Cases","anchor":"common-use-cases","text":"Display the learner's name on a welcome page. Show running quiz scores. Print certificate completion dates. Present personalized feedback based on variable values. All of these use inline variable replacement to dynamically update text.","level":2,"paragraphs":[{"text":"Display the learner's name on a welcome page. Show running quiz scores. Print certificate completion dates.","anchor":"common-use-cases-p0"},{"text":"Present personalized feedback based on variable values. All of these use inline variable replacement to dynamically update text.","anchor":"common-use-cases-p1"}]}],"tags":["variable","inline","replacement","text","personalization","dynamic"],"solved":false,"updatedAt":"2026-02-08"},{"id":"kb-lectora-007","type":"kb","product":"lectora","title":"Lectora Basics: Using User-Defined Variables","url":"https://knowledgebase.elblearning.com/lectora-basics-using-user-defined-variables","body":"Learn how to create and manage user-defined variables in Lectora. Variables let you store learner data, track progress, control navigation, and build personalized branching scenarios throughout your eLearning course.","sections":[{"heading":"Creating a Variable","anchor":"creating-a-variable","text":"Open the Variable Manager from the Tools menu. Click Add Variable. Choose the variable type: Text, Number, or Boolean. Give it a meaningful name and set an initial value. Variables are available globally across all pages in your title.","level":2,"paragraphs":[{"text":"Open the Variable Manager from the Tools menu. Click Add Variable. Choose the variable type: Text, Number, or Boolean.","anchor":"creating-a-variable-p0"},{"text":"Give it a meaningful name and set an initial value. Variables are available globally across all pages in your title.","anchor":"creating-a-variable-p1"}]},{"heading":"Using Variables in Actions","anchor":"using-variables-in-actions","text":"Modify variable values through actions. Use Set Variable to assign a value, Increment to increase a number, or Toggle to flip a boolean. Combine with conditions to create branching logic: if score >= 80 then show certificate page.","level":2,"paragraphs":[{"text":"Modify variable values through actions. Use Set Variable to assign a value, Increment to increase a number, or Toggle to flip a boolean.","anchor":"using-variables-in-actions-p0"},{"text":"Combine with conditions to create branching logic: if score >= 80 then show certificate page.","anchor":"using-variables-in-actions-p1"}]},{"heading":"Variable Scope and Persistence","anchor":"variable-scope-persistence","text":"User-defined variables persist for the duration of a session. To retain values across sessions, enable SCORM suspend data or use LMS bookmark variables. System variables like AICC_Score and AICC_Lesson_Status are automatically tracked by the LMS.","level":2,"paragraphs":[{"text":"User-defined variables persist for the duration of a session. To retain values across sessions, enable SCORM suspend data or use LMS bookmark variables.","anchor":"variable-scope-persistence-p0"},{"text":"System variables like AICC_Score and AICC_Lesson_Status are automatically tracked by the LMS.","anchor":"variable-scope-persistence-p1"}]}],"tags":["variables","user-defined","actions","branching","lectora-basics"],"solved":false,"updatedAt":"2026-02-12"},{"id":"kb-lectora-008","type":"kb","product":"lectora","title":"Lectora Basics: How to Use the Variable Manager","url":"https://knowledgebase.elblearning.com/lectora-basics-how-to-use-the-variable-manager","body":"The Variable Manager in Lectora provides a centralized interface for creating, editing, and organizing all variables in your title. Access it to review variable types, initial values, and usage throughout your course.","sections":[{"heading":"Accessing the Variable Manager","anchor":"accessing-variable-manager","text":"Open the Variable Manager from Tools > Variable Manager or press Ctrl+Shift+V. The panel lists all variables in your title grouped by type. Filter by name or type to quickly locate specific variables.","level":2,"paragraphs":[{"text":"Open the Variable Manager from Tools > Variable Manager or press Ctrl+Shift+V.","anchor":"accessing-variable-manager-p0"},{"text":"The panel lists all variables in your title grouped by type. Filter by name or type to quickly locate specific variables.","anchor":"accessing-variable-manager-p1"}]},{"heading":"Editing and Organizing Variables","anchor":"editing-organizing-variables","text":"Double-click a variable to edit its name, type, or initial value. Use the search bar to find variables by name. Delete unused variables to keep your project clean. The manager also shows where each variable is referenced, making it easy to track dependencies.","level":2,"paragraphs":[{"text":"Double-click a variable to edit its name, type, or initial value. Use the search bar to find variables by name.","anchor":"editing-organizing-variables-p0"},{"text":"Delete unused variables to keep your project clean. The manager also shows where each variable is referenced, making it easy to track dependencies.","anchor":"editing-organizing-variables-p1"}]}],"tags":["variable-manager","variables","tools","lectora-basics","organization"],"solved":false,"updatedAt":"2026-02-06"},{"id":"kb-lectora-009","type":"kb","product":"lectora","title":"Utilizing Pre-Tests in your Lectora Titles","url":"https://knowledgebase.elblearning.com/utilizing-pre-tests-in-your-lectora-titles","body":"Pre-tests allow you to assess learner knowledge before they begin a course module. Based on pre-test results, Lectora can skip content the learner already knows, creating an adaptive and efficient learning path.","sections":[{"heading":"Creating a Pre-Test","anchor":"creating-a-pre-test","text":"Insert a test at the beginning of your title or chapter. Mark it as a pre-test in the test properties. Add questions that map to specific content sections. Set passing thresholds to determine which sections a learner can skip.","level":2,"paragraphs":[{"text":"Insert a test at the beginning of your title or chapter. Mark it as a pre-test in the test properties.","anchor":"creating-a-pre-test-p0"},{"text":"Add questions that map to specific content sections. Set passing thresholds to determine which sections a learner can skip.","anchor":"creating-a-pre-test-p1"}]},{"heading":"Adaptive Navigation Based on Pre-Test Results","anchor":"adaptive-navigation","text":"Use pre-test score variables in actions and conditions to control navigation. If the learner passes the pre-test for a section, automatically skip that chapter. This creates a personalized learning path that respects existing knowledge.","level":2,"paragraphs":[{"text":"Use pre-test score variables in actions and conditions to control navigation.","anchor":"adaptive-navigation-p0"},{"text":"If the learner passes the pre-test for a section, automatically skip that chapter. This creates a personalized learning path that respects existing knowledge.","anchor":"adaptive-navigation-p1"}]}],"tags":["pre-test","test","assessment","adaptive","navigation","quiz"],"solved":false,"updatedAt":"2026-01-25"},{"id":"kb-lectora-010","type":"kb","product":"lectora","title":"Working with CSV Question Files","url":"https://knowledgebase.elblearning.com/working-with-csv-question-files","body":"Import quiz questions from CSV files into Lectora to speed up test creation. The CSV format supports multiple question types including multiple choice, true/false, matching, and fill-in-the-blank.","sections":[{"heading":"CSV File Format","anchor":"csv-file-format","text":"Structure your CSV with columns for question type, question text, answer options, correct answer, and feedback. Use the provided template to ensure proper formatting. Each row represents one question.","level":2,"paragraphs":[{"text":"Structure your CSV with columns for question type, question text, answer options, correct answer, and feedback.","anchor":"csv-file-format-p0"},{"text":"Use the provided template to ensure proper formatting. Each row represents one question.","anchor":"csv-file-format-p1"}]},{"heading":"Importing Questions","anchor":"importing-questions","text":"Go to File > Import > CSV Questions. Select your CSV file and map columns to question fields. Preview the imported questions before confirming. Lectora creates a test with all questions from the CSV automatically.","level":2,"paragraphs":[{"text":"Go to File > Import > CSV Questions. Select your CSV file and map columns to question fields.","anchor":"importing-questions-p0"},{"text":"Preview the imported questions before confirming. Lectora creates a test with all questions from the CSV automatically.","anchor":"importing-questions-p1"}]}],"tags":["csv","questions","import","test","quiz","assessment"],"solved":false,"updatedAt":"2026-01-20"},{"id":"kb-lectora-011","type":"kb","product":"lectora","title":"Custom Test Results","url":"https://knowledgebase.elblearning.com/custom-test-results","body":"Customize the test results page in Lectora to display personalized feedback, scores, pass/fail messages, and remediation paths based on learner performance.","sections":[{"heading":"Designing Results Pages","anchor":"designing-results-pages","text":"Edit the default test results page or create custom result pages. Display the score using the test score variable. Show pass or fail messages based on the threshold. Add a review button to let learners revisit incorrect answers.","level":2,"paragraphs":[{"text":"Edit the default test results page or create custom result pages. Display the score using the test score variable.","anchor":"designing-results-pages-p0"},{"text":"Show pass or fail messages based on the threshold. Add a review button to let learners revisit incorrect answers.","anchor":"designing-results-pages-p1"}]},{"heading":"Score-Based Branching","anchor":"score-based-branching","text":"Use the test score variable in conditions to create different paths. High scorers can skip remediation. Low scorers are routed to review content. Middle-range learners see targeted supplemental material. This creates a truly adaptive post-test experience.","level":2,"paragraphs":[{"text":"Use the test score variable in conditions to create different paths. High scorers can skip remediation.","anchor":"score-based-branching-p0"},{"text":"Low scorers are routed to review content. Middle-range learners see targeted supplemental material. This creates a truly adaptive post-test experience.","anchor":"score-based-branching-p1"}]}],"tags":["test","results","score","feedback","remediation","quiz"],"solved":false,"updatedAt":"2026-01-18"},{"id":"kb-lectora-012","type":"kb","product":"lectora","title":"Building a Drag and Drop Question with Lectora and Lectora Online","url":"https://knowledgebase.elblearning.com/building-a-drag-and-drop-question","body":"Create interactive drag and drop questions in Lectora to assess learner understanding through hands-on interactions. Drag and drop questions engage learners by requiring them to match, sort, or place items correctly.","sections":[{"heading":"Setting Up Drag Sources and Drop Targets","anchor":"drag-sources-drop-targets","text":"Insert objects as drag sources (items the learner drags) and drop targets (areas where items are placed). Assign correct pairings in the question properties. Each drag source can accept one or multiple correct targets.","level":2,"paragraphs":[{"text":"Insert objects as drag sources (items the learner drags) and drop targets (areas where items are placed).","anchor":"drag-sources-drop-targets-p0"},{"text":"Assign correct pairings in the question properties. Each drag source can accept one or multiple correct targets.","anchor":"drag-sources-drop-targets-p1"}]},{"heading":"Feedback and Scoring","anchor":"feedback-scoring","text":"Configure correct and incorrect feedback for each pairing. Set point values for accurate placements. Enable snap-to-target so items align perfectly when dropped. Add attempts limits and retry options for additional practice.","level":2,"paragraphs":[{"text":"Configure correct and incorrect feedback for each pairing. Set point values for accurate placements.","anchor":"feedback-scoring-p0"},{"text":"Enable snap-to-target so items align perfectly when dropped. Add attempts limits and retry options for additional practice.","anchor":"feedback-scoring-p1"}]}],"tags":["drag-and-drop","question","interaction","quiz","assessment"],"solved":false,"updatedAt":"2026-01-22"},{"id":"kb-lectora-013","type":"kb","product":"lectora","title":"Creating Randomized Tests in Lectora and Lectora Online","url":"https://knowledgebase.elblearning.com/creating-randomized-tests","body":"Randomize test questions in Lectora to prevent memorization and ensure assessment integrity. Configure question pools, random selection counts, and answer shuffling for a unique test experience each time.","sections":[{"heading":"Question Pools and Randomization","anchor":"question-pools-randomization","text":"Create a question pool by adding more questions than the test will display. Set the number of questions to randomly select from the pool. Each learner receives a unique subset. Answers within each question can also be shuffled.","level":2,"paragraphs":[{"text":"Create a question pool by adding more questions than the test will display. Set the number of questions to randomly select from the pool.","anchor":"question-pools-randomization-p0"},{"text":"Each learner receives a unique subset. Answers within each question can also be shuffled.","anchor":"question-pools-randomization-p1"}]}],"tags":["randomized","test","quiz","question-pool","assessment","shuffle"],"solved":false,"updatedAt":"2026-01-16"},{"id":"kb-lectora-014","type":"kb","product":"lectora","title":"Adding Web Windows in Lectora and Lectora Online","url":"https://knowledgebase.elblearning.com/adding-web-windows-in-lectora","body":"Embed external web content directly inside your Lectora course using Web Windows. Display live websites, web applications, Google Maps, embedded videos, or any URL-based content within a course page.","sections":[{"heading":"Inserting a Web Window","anchor":"inserting-web-window","text":"Go to Insert > Web Window. Enter the target URL or embed code. Resize and position the web window on your page. The content loads live at runtime, so learners see the latest version of the external resource.","level":2,"paragraphs":[{"text":"Go to Insert > Web Window. Enter the target URL or embed code.","anchor":"inserting-web-window-p0"},{"text":"Resize and position the web window on your page. The content loads live at runtime, so learners see the latest version of the external resource.","anchor":"inserting-web-window-p1"}]}],"tags":["web-window","embed","iframe","external-content","html"],"solved":false,"updatedAt":"2026-01-14"},{"id":"kb-lectora-015","type":"kb","product":"lectora","title":"Web Objects in Lectora and Lectora Online","url":"https://knowledgebase.elblearning.com/web-objects-in-lectora","body":"Use Web Objects to embed custom HTML, CSS, and JavaScript directly into your Lectora course. Web Objects give you full control to create custom interactions, integrate third-party widgets, and extend Lectora functionality.","sections":[{"heading":"Creating a Web Object","anchor":"creating-web-object","text":"Go to Insert > Web Object. Provide an HTML folder or a single HTML file. The web object renders inside an iframe on the page. Use the Lectora JavaScript API to communicate between the web object and the parent course for tracking and variable exchange.","level":2,"paragraphs":[{"text":"Go to Insert > Web Object. Provide an HTML folder or a single HTML file. The web object renders inside an iframe on the page.","anchor":"creating-web-object-p0"},{"text":"Use the Lectora JavaScript API to communicate between the web object and the parent course for tracking and variable exchange.","anchor":"creating-web-object-p1"}]}],"tags":["web-object","html","javascript","custom","embed","api"],"solved":false,"updatedAt":"2026-01-12"},{"id":"kb-lectora-016","type":"kb","product":"lectora","title":"How to Insert Custom HTML Into Lectora","url":"https://knowledgebase.elblearning.com/how-to-insert-custom-html-into-lectora","body":"Insert custom HTML snippets into Lectora to add specialized content such as embedded forms, interactive widgets, analytics tracking codes, or custom styled elements that go beyond built-in Lectora objects.","sections":[{"heading":"Adding Custom HTML","anchor":"adding-custom-html","text":"Use the HTML Extension object to inject raw HTML into a page. Go to Insert > HTML Extension. Paste your HTML code in the editor. The code is rendered inline alongside other Lectora objects on the page.","level":2,"paragraphs":[{"text":"Use the HTML Extension object to inject raw HTML into a page. Go to Insert > HTML Extension.","anchor":"adding-custom-html-p0"},{"text":"Paste your HTML code in the editor. The code is rendered inline alongside other Lectora objects on the page.","anchor":"adding-custom-html-p1"}]},{"heading":"Best Practices","anchor":"best-practices","text":"Keep custom HTML lightweight to avoid performance issues. Test in all target browsers. Avoid conflicting CSS styles with Lectora's built-in styles. Use external files for complex JavaScript to keep the HTML snippet clean.","level":2,"paragraphs":[{"text":"Keep custom HTML lightweight to avoid performance issues. Test in all target browsers.","anchor":"best-practices-p0"},{"text":"Avoid conflicting CSS styles with Lectora's built-in styles. Use external files for complex JavaScript to keep the HTML snippet clean.","anchor":"best-practices-p1"}]}],"tags":["html","custom","extension","embed","code","widget"],"solved":false,"updatedAt":"2026-01-10"},{"id":"comm-general-002","type":"community","product":"general","title":"The Brain Science Behind a Psychologically Safe Learning Environment","url":"https://community.elblearning.com/topics/the-brain-science-behind-a-psychologically-safe-learning-environment-f4449466?hsLang=en","body":"Explore the neuroscience of psychological safety in learning. Understand how the brain processes threat versus reward in training scenarios and why creating a safe environment leads to better retention, engagement, and knowledge transfer.","tags":["learning","psychology","brain-science","safety","retention","engagement"],"solved":false,"accepted":false,"replies":0,"views":156,"updatedAt":"2023-01-27"},{"id":"comm-general-003","type":"community","product":"general","title":"ELB Learning Wins Top Content Providers for Team building Training 2023","url":"https://community.elblearning.com/topics/elb-learning-wins-top-content-providers-for-team-building-training-2023-4cdd2750?hsLang=en","body":"ELB Learning has been recognized as a Top Content Provider for Team Building Training in 2023.","tags":["elb-learning","awards","team-building","training","content-providers","2023"],"solved":false,"accepted":false,"replies":0,"views":112,"updatedAt":"2022-11-21"},{"id":"comm-general-004","type":"community","product":"general","title":"6 Tips to Transform Performance & Boost ROI with Video","url":"https://community.elblearning.com/topics/join-don-schmidt-to-learn-6-tips-to-transform-performance-ampamp-boost-roi-with-video-fd947f18?hsLang=en","body":"Learn six practical tips for using video to transform employee performance and boost training ROI.","tags":["video","roi","performance","training","tips","engagement","media"],"solved":false,"accepted":false,"replies":1,"views":89,"updatedAt":"2023-01-11"},{"id":"comm-general-005","type":"community","product":"general","title":"ELB Learning Wins Bronze Excellence in E-Learning Award in the 2022 Learning in Practice Awards","url":"https://community.elblearning.com/topics/elb-learning-wins-bronze-excellence-in-elearning-award-in-the-2022-learning-in-practice-awards-8425d159?hsLang=en","body":"ELB Learning has received the Bronze Excellence in E-Learning Award at the 2022 Learning in Practice Awards.","tags":["elb-learning","awards","excellence","elearning","recognition","2022"],"solved":false,"accepted":false,"replies":0,"views":74,"updatedAt":"2022-11-08"},{"id":"comm-general-006","type":"community","product":"general","title":"ELB Learning wins Top Blended Learning Content Providers for 2023","url":"https://community.elblearning.com/topics/elb-learning-wins-top-blended-learning-content-providers-for-2023-a22d5d06?hsLang=en","body":"ELB Learning is recognized as a Top Blended Learning Content Provider for 2023.","tags":["elb-learning","awards","blended-learning","content-providers","2023"],"solved":false,"accepted":false,"replies":0,"views":67,"updatedAt":"2022-10-31"},{"id":"comm-general-007","type":"community","product":"general","title":"Recently Released eBooks and Infographics | February 2026","url":"https://community.elblearning.com/topics/recently-released-ebooks-and-infographics-february-2026-ml7z2c9r?hsLang=en","body":"Check out the latest eBooks and infographics released by ELB Learning covering eLearning best practices, instructional design, gamification, VR learning, and microlearning trends for 2026.","tags":["ebooks","infographics","resources","elearning","instructional-design","2026"],"solved":false,"accepted":false,"replies":0,"views":45,"updatedAt":"2026-02-04"},{"id":"comm-general-008","type":"community","product":"general","title":"Upcoming Webinars & Events | February 2026","url":"https://community.elblearning.com/topics/upcoming-webinars-and-events-february-2026-ml7ypecs?hsLang=en","body":"Join upcoming webinars and events hosted by ELB Learning. Topics include authoring tips for Lectora, immersive VR with CenarioVR, gamification with The Training Arcade, and LMS best practices.","tags":["webinars","events","training","lectora","cenariovr","gamification","2026"],"solved":false,"accepted":false,"replies":0,"views":38,"updatedAt":"2026-02-04"},{"id":"comm-general-009","type":"community","product":"general","title":"Summary of Recent Blog Posts | January 2026","url":"https://community.elblearning.com/topics/summary-of-recent-blog-posts-january-2026-ml7ywtf1?hsLang=en","body":"A roundup of recent blog posts from ELB Learning covering AI in eLearning, accessibility, SCORM vs xAPI, mobile learning, video-based training, and content authoring tips.","tags":["blog","summary","ai","accessibility","scorm","xapi","mobile-learning","2026"],"solved":false,"accepted":false,"replies":0,"views":52,"updatedAt":"2026-02-04"},{"id":"comm-general-010","type":"community","product":"general","title":"Summary of Recent Blog Posts | December 2025","url":"https://community.elblearning.com/topics/summary-of-recent-blog-posts-december-2025-mk2jy77r?hsLang=en","body":"Catch up on the latest blog posts from December 2025 including eLearning trends, new Lectora Online features, CenarioVR updates, and Training Arcade engagement strategies.","tags":["blog","summary","elearning","trends","lectora-online","cenariovr","2025"],"solved":false,"accepted":false,"replies":0,"views":61,"updatedAt":"2026-01-06"},{"id":"comm-general-011","type":"community","product":"general","title":"Upcoming Webinars & Events | January 2026","url":"https://community.elblearning.com/topics/upcoming-webinars-and-events-january-2026-mk2jrlvb?hsLang=en","body":"Sessions cover Lectora advanced techniques, CenarioVR immersive scenarios, ReviewLink collaboration, and CourseMill LMS administration.","tags":["webinars","events","lectora","cenariovr","reviewlink","coursemill","2026"],"solved":false,"accepted":false,"replies":0,"views":43,"updatedAt":"2026-01-06"},{"id":"comm-coursemill-001","type":"community","product":"coursemill","title":"CourseMill LMS Tips: Managing Large User Groups","url":"https://community.elblearning.com/topics/coursemill-lms-tips-managing-large-user-groups-mk3abc01?hsLang=en","body":"Best practices for managing large user groups in CourseMill. Tips on bulk CSV imports, department-based assignments, automated enrollment rules, and efficient reporting for organizations with thousands of learners.","tags":["coursemill","lms","users","groups","management","tips"],"solved":true,"accepted":true,"solutionText":"Use the Department Auto-Assign feature in CourseMill Admin > Settings > Enrollment Rules. Create rules that automatically enroll users into courses based on their department or role. Combined with CSV bulk import, this handles thousands of users efficiently.","replies":12,"views":234,"updatedAt":"2026-02-10"},{"id":"comm-coursemill-002","type":"community","product":"coursemill","title":"Getting Started with CourseMill: Common Setup Questions","url":"https://community.elblearning.com/topics/getting-started-coursemill-common-setup-questions-mk3def02?hsLang=en","body":"A collection of frequently asked questions about getting started with CourseMill LMS. Covers initial configuration, SSO setup, SCORM upload troubleshooting, and dashboard customization for new administrators.","tags":["coursemill","getting-started","setup","faq","lms","admin"],"solved":true,"accepted":true,"solutionText":"For initial CourseMill setup: 1) Log into admin console 2) Go to Settings > Organization to set branding 3) Configure authentication under Settings > SSO 4) Upload courses via Content > Add Course 5) Create user groups under Users > Groups. The Getting Started with CourseMill KB article covers each step in detail.","replies":8,"views":189,"updatedAt":"2026-02-15"}]};
+  var _BUILTIN_INDEX = {"version":"4.4.0","description":"v4.4: ELB Assistant - Comprehensive index with full KB and community article coverage across all products","updatedAt":"2026-03-02T00:00:00Z","synonyms":{"publish":["export","deploy","release","output","generate"],"error":["bug","issue","problem","crash","failure","broken"],"install":["setup","configure","download","deploy"],"create":["build","make","add","new","generate","author"],"course":["module","lesson","training","content","curriculum"],"quiz":["test","assessment","exam","evaluation"],"report":["analytics","statistics","data","metrics","dashboard"],"scorm":["xapi","tincan","cmi5","aicc","package"],"responsive":["mobile","adaptive","flexible","rcd"],"variable":["parameter","field","value","token"],"template":["layout","theme","design","preset"],"user":["student","learner","participant","member","account"],"vr":["virtual reality","immersive","360","headset"],"game":["gamification","arcade","interactive","engagement"],"arcade":["training arcade","game","gamification","training-arcade"],"release":["update","version","changelog","patch","upgrade","what\u0027s new","latest"],"notes":["changelog","updates","log","history","changes","announcements"],"release notes":["changelog","updates","what\u0027s new","latest version","version history"],"import":["upload","load","bring in","transfer","ingest"],"accessibility":["a11y","wcag","508","screen reader","ada","compliance"],"powerpoint":["pptx","slides","presentation","ppt"],"lms":["learning management system","coursemill","rockstar","platform"],"microlearning":["micro","bite-sized","micro-module","short-form","microbuilder"],"ai":["artificial intelligence","generative","machine learning","gpt","chatbot"],"rehearsal":["practice","coaching","video practice","role-play"],"review":["feedback","markup","annotation","reviewlink","comment"]},"weightConfig":{"titleExact":120,"titlePartial":70,"titleFuzzy":35,"headingExact":50,"headingPartial":30,"headingFuzzy":18,"bodyExact":40,"bodyPartial":25,"bodyFuzzy":12,"paragraphExact":45,"paragraphPartial":28,"paragraphFuzzy":14,"synonymMatch":0.7,"solvedBoost":30,"acceptedBoost":20,"recencyDays":365,"recencyWeight":10,"tagMatch":15,"productMatch":20,"semanticWeight":30,"rlWeight":1.0},"confidenceConfig":{"high":0.80,"medium":0.50,"minRenderThreshold":0.01,"maxResults":10},"articles":[{"id":"kb-lectora-001","type":"kb","product":"lectora","title":"Getting Started: Lectora Training Plan","url":"https://knowledgebase.elblearning.com/lectora-training-plan-everything-you-need-to-know","body":"Everything you need to know to get started with Lectora. This training plan covers installation, setup, course creation, publishing, and advanced features. Follow the step-by-step guide to build your first eLearning course.","sections":[{"heading":"Installation \u0026 Setup","anchor":"installation-setup","text":"Download Lectora Desktop from the ELB Learning website. Run the installer and follow the on-screen prompts. Enter your license key when prompted. For Lectora Online, sign in at lectora.com with your ELB Learning credentials.","level":2,"paragraphs":[{"text":"Download Lectora Desktop from the ELB Learning website. Run the installer and follow the on-screen prompts.","anchor":"installation-setup-p0"},{"text":"Enter your license key when prompted. For Lectora Online, sign in at lectora.com with your ELB Learning credentials.","anchor":"installation-setup-p1"}]},{"heading":"Creating Your First Course","anchor":"creating-your-first-course","text":"Start a new project by selecting File \u003e New. Choose a template or start from scratch. Add pages, chapters, and sections. Insert text blocks, images, audio, and video. Configure navigation and transitions.","level":2,"paragraphs":[{"text":"Start a new project by selecting File \u003e New. Choose a template or start from scratch.","anchor":"creating-your-first-course-p0"},{"text":"Add pages, chapters, and sections. Insert text blocks, images, audio, and video.","anchor":"creating-your-first-course-p1"},{"text":"Configure navigation and transitions between pages for a smooth learner experience.","anchor":"creating-your-first-course-p2"}]},{"heading":"Publishing Options","anchor":"publishing-options","text":"Publish your course for different platforms. Choose SCORM 1.2, SCORM 2004, xAPI (Tin Can), AICC, or HTML5. Set output options including responsive design. Select the target LMS and configure tracking settings. Export the package and upload to your LMS.","level":2,"paragraphs":[{"text":"Publish your course for different platforms. Choose SCORM 1.2, SCORM 2004, xAPI (Tin Can), AICC, or HTML5.","anchor":"publishing-options-p0"},{"text":"Set output options including responsive design. Select the target LMS and configure tracking settings.","anchor":"publishing-options-p1"},{"text":"Export the package and upload to your LMS. Verify tracking data is correctly sent by launching the course in your LMS and completing a test run.","anchor":"publishing-options-p2"}]},{"heading":"Variables and Actions","anchor":"variables-and-actions","text":"Use variables to store and track learner data. Create custom variables for scores, completion status, and user input. Set up actions triggered by events like button clicks, page load, or timer completion. Use conditions to create branching scenarios.","level":2,"paragraphs":[{"text":"Use variables to store and track learner data. Create custom variables for scores, completion status, and user input.","anchor":"variables-and-actions-p0"},{"text":"Set up actions triggered by events like button clicks, page load, or timer completion. Use conditions to create branching scenarios.","anchor":"variables-and-actions-p1"}]}],"tags":["getting-started","training-plan","installation","publishing","variables"],"solved":false,"updatedAt":"2026-02-15"},{"id":"kb-lectora-002","type":"kb","product":"lectora","title":"Quick Guide: Lectora and PowerPoint","url":"https://knowledgebase.elblearning.com/lectora-and-powerpoint-start-here","body":"Convert PowerPoint presentations to interactive Lectora courses. Import slides, preserve animations, add interactivity, and publish as eLearning content.","sections":[{"heading":"Importing PowerPoint","anchor":"importing-powerpoint","text":"Go to File \u003e Import \u003e PowerPoint. Select your .pptx file. Choose import options: preserve layout, import animations, maintain slide order. The importer converts each slide to a Lectora page.","level":2,"paragraphs":[{"text":"Go to File \u003e Import \u003e PowerPoint. Select your .pptx file.","anchor":"importing-powerpoint-p0"},{"text":"Choose import options: preserve layout, import animations, maintain slide order. The importer converts each slide to a Lectora page.","anchor":"importing-powerpoint-p1"}]},{"heading":"Adding Interactivity","anchor":"adding-interactivity","text":"After import, enhance slides with Lectora interactivity. Add buttons, quiz questions, drag-and-drop interactions, and clickable hotspots. Use actions and triggers to control navigation flow.","level":2,"paragraphs":[{"text":"After import, enhance slides with Lectora interactivity. Add buttons, quiz questions, drag-and-drop interactions, and clickable hotspots.","anchor":"adding-interactivity-p0"},{"text":"Use actions and triggers to control navigation flow between slides and interactive elements.","anchor":"adding-interactivity-p1"}]}],"tags":["powerpoint","import","conversion","slides"],"solved":false,"updatedAt":"2026-02-10"},{"id":"kb-lectora-003","type":"kb","product":"lectora","title":"Responsive Course Design (RCD) in Lectora","url":"https://knowledgebase.elblearning.com/responsive-course-design-in-lectora","body":"Build mobile-responsive courses that adapt to any screen size. Lectora\u0027s Responsive Course Design (RCD) automatically adjusts layout for desktop, tablet, and mobile devices.","sections":[{"heading":"Enabling RCD","anchor":"enabling-rcd","text":"When creating a new title, select Responsive Design. This enables the responsive grid system. Content automatically reflows based on device width. You can also convert existing courses to responsive layout.","level":2,"paragraphs":[{"text":"When creating a new title, select Responsive Design. This enables the responsive grid system.","anchor":"enabling-rcd-p0"},{"text":"Content automatically reflows based on device width. You can also convert existing courses to responsive layout.","anchor":"enabling-rcd-p1"}]},{"heading":"Breakpoints and Layouts","anchor":"breakpoints-and-layouts","text":"RCD uses three default breakpoints: Desktop (1024px+), Tablet (768px), and Mobile (480px). Customize breakpoints in project settings. Each breakpoint can have a different layout. Use the device preview toolbar to test each view.","level":2,"paragraphs":[{"text":"RCD uses three default breakpoints: Desktop (1024px+), Tablet (768px), and Mobile (480px). Customize breakpoints in project settings.","anchor":"breakpoints-and-layouts-p0"},{"text":"Each breakpoint can have a different layout. Use the device preview toolbar to test each view.","anchor":"breakpoints-and-layouts-p1"}]},{"heading":"Mobile-Specific Settings","anchor":"mobile-specific-settings","text":"Configure touch-friendly button sizes for mobile. Adjust font sizes and spacing. Enable swipe navigation. Test gesture interactions. Ensure accessibility compliance on all devices.","level":2,"paragraphs":[{"text":"Configure touch-friendly button sizes for mobile. Adjust font sizes and spacing.","anchor":"mobile-specific-settings-p0"},{"text":"Enable swipe navigation. Test gesture interactions. Ensure accessibility compliance on all devices.","anchor":"mobile-specific-settings-p1"}]}],"tags":["responsive","rcd","mobile","adaptive","layout"],"solved":false,"updatedAt":"2026-01-28"},{"id":"kb-cenariovr-001","type":"kb","product":"cenariovr","title":"Getting Started: CenarioVR","url":"https://knowledgebase.elblearning.com/cenariovr-getting-started","body":"Learn how to create immersive virtual reality learning experiences with CenarioVR. This guide covers 360-degree video, hotspots, branching scenarios, and publishing for VR headsets.","sections":[{"heading":"Dashboard Overview","anchor":"dashboard-overview","text":"The CenarioVR dashboard shows your projects, templates, and recent activity. Create a new scenario from the dashboard. Browse the template library for pre-built VR experiences. Manage team members and sharing settings.","level":2,"paragraphs":[{"text":"The CenarioVR dashboard shows your projects, templates, and recent activity.","anchor":"dashboard-overview-p0"},{"text":"Create a new scenario from the dashboard. Browse the template library for pre-built VR experiences. Manage team members and sharing settings.","anchor":"dashboard-overview-p1"}]},{"heading":"Adding 360 Content","anchor":"adding-360-content","text":"Upload 360-degree photos or videos as scene backgrounds. Supported formats include equirectangular JPG, PNG, and MP4. Add interactive hotspots, text overlays, and navigation waypoints. Create branching paths between scenes.","level":2,"paragraphs":[{"text":"Upload 360-degree photos or videos as scene backgrounds. Supported formats include equirectangular JPG, PNG, and MP4.","anchor":"adding-360-content-p0"},{"text":"Add interactive hotspots, text overlays, and navigation waypoints. Create branching paths between scenes.","anchor":"adding-360-content-p1"}]},{"heading":"Publishing for VR","anchor":"publishing-for-vr","text":"Publish your CenarioVR experience for web browsers, Oculus Quest, HTC Vive, or mobile VR. Generate a shareable link or SCORM package for LMS integration. Configure quality settings and loading screens.","level":2,"paragraphs":[{"text":"Publish your CenarioVR experience for web browsers, Oculus Quest, HTC Vive, or mobile VR.","anchor":"publishing-for-vr-p0"},{"text":"Generate a shareable link or SCORM package for LMS integration. Configure quality settings and loading screens.","anchor":"publishing-for-vr-p1"}]}],"tags":["getting-started","vr","360","immersive","headset"],"solved":false,"updatedAt":"2026-02-05"},{"id":"kb-training-arcade-001","type":"kb","product":"training-arcade","title":"Step-by-Step Tutorials: The Training Arcade","url":"https://knowledgebase.elblearning.com/learn-how-to-build-effective-training-games","body":"Create engaging training games with The Training Arcade. Choose from multiple game templates including trivia, word search, flashcards, and more. Customize content, branding, and difficulty levels.","sections":[{"heading":"Choosing a Game Template","anchor":"choosing-a-game-template","text":"Browse the game library to select a template. Options include Jeopardy-style trivia, memory match, word search, spin the wheel, and flashcards. Each template is fully customizable with your training content.","level":2},{"heading":"Adding Content to Games","anchor":"adding-content-to-games","text":"Enter questions, answers, and feedback for each game. Support for text, images, audio, and video. Set correct answers and point values. Configure difficulty levels and time limits.","level":2},{"heading":"Publishing and LMS Integration","anchor":"publishing-and-lms-integration","text":"Export games as SCORM packages for LMS tracking. Generate shareable web links. Embed games directly in websites using iframe code. Track completion and scores through your LMS.","level":2}],"tags":["games","gamification","trivia","engagement","tutorial","arcade","training-arcade"],"solved":false,"updatedAt":"2026-02-01"},{"id":"kb-microbuilder-001","type":"kb","product":"microbuilder","title":"How To Create a Microlearning Module in MicroBuilder","url":"https://knowledgebase.elblearning.com/how-to-create-a-microlearning-module-in-microbuilder","body":"Build bite-sized learning modules quickly with MicroBuilder. The easy-to-use authoring tool lets you create microlearning content without technical skills.","sections":[{"heading":"Creating a New Module","anchor":"creating-a-new-module","text":"Click Create New from the dashboard. Choose a layout template or start blank. Add content blocks: text, images, video, quizzes, and interactive elements. Drag and drop to reorder sections.","level":2},{"heading":"AI-Assisted Content Generation","anchor":"ai-assisted-content-generation","text":"Use MicroBuilder\u0027s AI assistant to generate learning content. Provide a topic or paste existing text. The AI creates structured microlearning modules with questions and key takeaways. Review and customize the generated content.","level":2},{"heading":"Publishing Your Module","anchor":"publishing-your-module","text":"Publish your microlearning module as a web link, SCORM package, or embed code. Share via email, Slack, or your LMS. Track engagement and completion analytics from the dashboard.","level":2}],"tags":["microlearning","authoring","ai","content-creation"],"solved":false,"updatedAt":"2026-02-18"},{"id":"kb-rockstar-001","type":"kb","product":"rockstar","title":"Guide to Getting Started with Rockstar Learning Platform","url":"https://knowledgebase.elblearning.com/guide-to-getting-started-with-knowledgelink","body":"Set up and configure the Rockstar Learning Platform for your organization. Manage users, courses, learning paths, and reporting.","sections":[{"heading":"User Management","anchor":"user-management","text":"Add users individually or via bulk CSV import. Set user roles: Admin, Manager, Instructor, Learner. Configure SSO integration with your identity provider. Manage groups and departments for targeted training assignments.","level":2,"paragraphs":[{"text":"Add users individually or via bulk CSV import. Set user roles: Admin, Manager, Instructor, Learner.","anchor":"user-management-p0"},{"text":"Configure SSO integration with your identity provider. Manage groups and departments for targeted training assignments.","anchor":"user-management-p1"}]},{"heading":"Course Assignment","anchor":"course-assignment","text":"Upload SCORM, xAPI, or video courses. Create learning paths with prerequisites. Assign courses to individuals, groups, or departments. Set due dates and send automated reminders.","level":2},{"heading":"Reports and Analytics","anchor":"reports-and-analytics","text":"View completion rates, scores, and engagement metrics. Generate custom reports by user, course, or department. Export data as CSV or PDF. Schedule automated report delivery via email.","level":2}],"tags":["lms","platform","users","reports","courses"],"solved":false,"updatedAt":"2026-01-20"},{"id":"comm-lectora-001","type":"community","product":"lectora","title":"The Return of the In-Person User Conference?","url":"https://community.elblearning.com/topics/the-return-of-the-inperson-user-conference-2fca939b?hsLang=en","body":"We\u0027ve heard requests from some avid Lectora fans to bring back the Lectora User Conference (LUC). We hear you. But we want to do it right. We\u0027ve grown a ton since the Trivantis days and have many more products. So, we\u0027d like to know what you\u0027d be willing to participate in.","tags":["lectora","conference","user-group","training","community"],"solved":false,"accepted":false,"replies":9,"views":345,"updatedAt":"2023-08-02"},{"id":"comm-lectora-002","type":"community","product":"lectora","title":"Join us for In-Person Training on Lectora","url":"https://community.elblearning.com/topics/join-us-for-inperson-training-on-lectora-82b10a16?hsLang=en","body":"Join us for hands-on, in-person training sessions on Lectora. Learn from experts, get certified, and connect with fellow Lectora users and eLearning professionals.","tags":["lectora","training","in-person","certification","workshop"],"solved":false,"accepted":false,"replies":0,"views":210,"updatedAt":"2023-06-16"},{"id":"comm-cenariovr-001","type":"community","product":"general","title":"ELB\u0027s new Community Web App","url":"https://community.elblearning.com/topics/elb39s-new-quotcommunityquot-web-app-d7785aa7?hsLang=en","body":"ELB Learning has launched a new Community web app for users to connect, ask questions, share knowledge, and meet fellow learners and educators. Get involved by signing in and exploring the diverse range of topics.","tags":["community","web-app","elb-learning","networking","discussion"],"solved":false,"accepted":false,"replies":16,"views":428,"updatedAt":"2023-07-26"},{"id":"comm-rockstar-001","type":"community","product":"general","title":"ELB Learning Wins Top Content Providers for Diversity And Inclusion Training","url":"https://community.elblearning.com/topics/elb-learning-is-number-4-for-top-content-providers-for-diversity-and-inclusion-training-ae6904f3?hsLang=en","body":"ELB Learning is number 4 for Top Content Providers for Diversity And Inclusion Training! This recognition highlights our commitment to creating impactful and inclusive learning experiences for organizations worldwide.","tags":["elb-learning","awards","diversity","inclusion","content-providers"],"solved":false,"accepted":false,"replies":0,"views":189,"updatedAt":"2023-05-12"},{"id":"comm-training-arcade-001","type":"community","product":"general","title":"ELB Learning wins 2022 Top Advanced Learning Technologies Companies List","url":"https://community.elblearning.com/topics/elb-learning-wins-2022-top-advanced-learning-technologies-companies-list-29ea4075?hsLang=en","body":"ELB Learning has been recognized on the 2022 Top Advanced Learning Technologies Companies List, showcasing our suite of innovative tools including Lectora, CenarioVR, The Training Arcade, and more.","tags":["elb-learning","awards","technology","recognition","learning-tools","arcade","training-arcade"],"solved":false,"accepted":false,"replies":0,"views":95,"updatedAt":"2022-10-31"},{"id":"kb-general-001","type":"kb","product":"lectora","title":"Lectora Online Release Notes","url":"https://knowledgebase.elblearning.com/lectora-online-release-notes","body":"Stay up to date with the latest features, improvements, and bug fixes for Lectora Online. Check release notes for new capabilities, enhancements, and resolved issues across recent versions.","sections":[{"heading":"Latest Releases","anchor":"latest-releases","text":"Check back regularly for the newest updates. Each product section below lists recent changes chronologically. Major updates include new features and significant improvements. Minor updates include bug fixes and performance enhancements.","level":2}],"tags":["release-notes","updates","changelog","versions","lectora-online"],"solved":false,"updatedAt":"2026-02-20"},{"id":"kb-general-002","type":"kb","product":"lectora","title":"Lectora Desktop Release Notes","url":"https://knowledgebase.elblearning.com/lectora-desktop-release-notes","body":"View the complete history of Lectora Desktop updates including new features, bug fixes, and performance improvements. Each release is documented with version numbers and detailed change descriptions.","sections":[{"heading":"Recent Updates","anchor":"recent-updates","text":"Lectora Desktop receives regular updates with new authoring features, accessibility improvements, and publishing enhancements. Check this page for the latest version information and download links.","level":2}],"tags":["release-notes","updates","changelog","versions","lectora-desktop"],"solved":false,"updatedAt":"2026-02-22"},{"id":"kb-general-003","type":"kb","product":"cenariovr","title":"CenarioVR Release Notes","url":"https://knowledgebase.elblearning.com/cenariovr-release-notes","body":"Stay up to date with CenarioVR platform updates. Release notes cover new VR authoring features, scene editor improvements, publishing updates, and bug fixes for the immersive learning platform.","sections":[{"heading":"Latest CenarioVR Updates","anchor":"latest-cenariovr-updates","text":"CenarioVR is continuously improved with new features for VR content creation. Recent updates include enhanced 360 video support, improved hotspot interactions, and new publishing options for VR headsets.","level":2}],"tags":["release-notes","updates","changelog","versions","cenariovr"],"solved":false,"updatedAt":"2026-02-18"},{"id":"kb-general-004","type":"kb","product":"rockstar","title":"Rockstar Learning Platform Release Notes","url":"https://knowledgebase.elblearning.com/rockstar-learning-platform-release-notes","body":"Track all updates to the Rockstar Learning Platform (formerly KnowledgeLink). Release notes document new LMS features, admin panel improvements, reporting enhancements, and integration updates.","sections":[{"heading":"Platform Updates","anchor":"platform-updates","text":"The Rockstar Learning Platform is regularly updated with new features for course management, user administration, and analytics. Recent releases include enhanced reporting dashboards, improved SSO support, and mobile app updates.","level":2}],"tags":["release-notes","updates","changelog","versions","rockstar","lms"],"solved":false,"updatedAt":"2026-02-15"},{"id":"kb-general-005","type":"kb","product":"coursemill","title":"CourseMill Release Notes","url":"https://knowledgebase.elblearning.com/coursemill-release-notes","body":"View all CourseMill LMS updates and version history. Release notes cover admin panel improvements, learner experience updates, compliance tracking enhancements, and API changes.","sections":[{"heading":"CourseMill Version History","anchor":"coursemill-version-history","text":"CourseMill receives periodic updates improving course management, user administration, and reporting capabilities. Check release notes for detailed information about each version.","level":2}],"tags":["release-notes","updates","changelog","versions","coursemill","lms"],"solved":false,"updatedAt":"2026-02-12"},{"id":"kb-reviewlink-001","type":"kb","product":"reviewlink","title":"Getting Started with ReviewLink","url":"https://knowledgebase.elblearning.com/getting-started-with-reviewlink","body":"ReviewLink streamlines the content review process. Upload your eLearning content, invite reviewers, collect feedback with inline annotations, and manage review cycles.","sections":[{"heading":"Uploading Content for Review","anchor":"uploading-content","text":"Upload SCORM packages, HTML5 content, or video files to ReviewLink. The platform renders your content in a browser-based viewer. Reviewers can navigate through the content and leave contextual feedback.","level":2},{"heading":"Markup and Annotations","anchor":"markup-and-annotations","text":"Reviewers can add markup directly on the content. Use text annotations, arrows, highlights, and stamps. Each comment is pinned to a specific location on the page. Authors receive notifications and can respond to each comment.","level":2}],"tags":["review","feedback","annotations","collaboration"],"solved":false,"updatedAt":"2026-01-25"},{"id":"kb-coursemill-001","type":"kb","product":"coursemill","title":"CourseMill Student UI Overview","url":"https://knowledgebase.elblearning.com/coursemill-student-ui-overview","body":"Navigate the CourseMill learning management system as a student. Access your assigned courses, track progress, view certificates, and manage your learning profile.","sections":[{"heading":"My Learning Dashboard","anchor":"my-learning-dashboard","text":"The dashboard displays your assigned courses, completion progress, and upcoming deadlines. Filter by status: Not Started, In Progress, or Completed. Click any course tile to launch the content.","level":2,"paragraphs":[{"text":"The dashboard displays your assigned courses, completion progress, and upcoming deadlines.","anchor":"my-learning-dashboard-p0"},{"text":"Filter by status: Not Started, In Progress, or Completed. Click any course tile to launch the content.","anchor":"my-learning-dashboard-p1"}]},{"heading":"Certificates and Transcripts","anchor":"certificates-and-transcripts","text":"After completing a course, access your certificate from the Completed section. Download or print certificates. View your full learning transcript with dates, scores, and completion status for all courses.","level":2,"paragraphs":[{"text":"After completing a course, access your certificate from the Completed section. Download or print certificates.","anchor":"certificates-and-transcripts-p0"},{"text":"View your full learning transcript with dates, scores, and completion status for all courses.","anchor":"certificates-and-transcripts-p1"}]}],"tags":["lms","student","dashboard","certificates","tracking","getting-started"],"solved":false,"updatedAt":"2026-01-15"},{"id":"kb-coursemill-002","type":"kb","product":"coursemill","title":"Getting Started with CourseMill LMS","url":"https://knowledgebase.elblearning.com/getting-started-with-coursemill","body":"Get started with CourseMill, the learning management system by ELB Learning. This guide covers initial setup, user creation, course uploading, assignment configuration, and reporting basics for CourseMill administrators.","sections":[{"heading":"Initial Setup and Configuration","anchor":"initial-setup-configuration","text":"Log in to the CourseMill admin console. Configure your organization settings including branding, default language, and notification preferences. Set up authentication methods: built-in credentials, LDAP, or SSO.","level":2,"paragraphs":[{"text":"Log in to the CourseMill admin console. Configure your organization settings including branding, default language, and notification preferences.","anchor":"initial-setup-configuration-p0"},{"text":"Set up authentication methods: built-in credentials, LDAP, or SSO.","anchor":"initial-setup-configuration-p1"}]},{"heading":"Managing Users and Groups","anchor":"managing-users-groups","text":"Create user accounts individually or import via CSV. Assign roles: Administrator, Manager, Instructor, or Learner. Organize users into groups and departments for targeted course assignments and reporting.","level":2,"paragraphs":[{"text":"Create user accounts individually or import via CSV. Assign roles: Administrator, Manager, Instructor, or Learner.","anchor":"managing-users-groups-p0"},{"text":"Organize users into groups and departments for targeted course assignments and reporting.","anchor":"managing-users-groups-p1"}]},{"heading":"Uploading and Assigning Courses","anchor":"uploading-assigning-courses","text":"Upload SCORM, AICC, or xAPI course packages to CourseMill. Create learning paths with prerequisites and deadlines. Assign courses to individuals, groups, or the entire organization. Configure enrollment rules and automated reminders.","level":2,"paragraphs":[{"text":"Upload SCORM, AICC, or xAPI course packages to CourseMill. Create learning paths with prerequisites and deadlines.","anchor":"uploading-assigning-courses-p0"},{"text":"Assign courses to individuals, groups, or the entire organization. Configure enrollment rules and automated reminders.","anchor":"uploading-assigning-courses-p1"}]},{"heading":"Reports and Compliance Tracking","anchor":"reports-compliance-tracking","text":"Generate detailed reports on learner progress, course completions, and compliance status. Schedule automated report delivery. Export data in CSV or PDF format for external analysis. Use the compliance dashboard to track mandatory training deadlines.","level":2,"paragraphs":[{"text":"Generate detailed reports on learner progress, course completions, and compliance status. Schedule automated report delivery.","anchor":"reports-compliance-tracking-p0"},{"text":"Export data in CSV or PDF format for external analysis. Use the compliance dashboard to track mandatory training deadlines.","anchor":"reports-compliance-tracking-p1"}]}],"tags":["getting-started","lms","setup","admin","courses","users","reports","coursemill"],"solved":false,"updatedAt":"2026-02-18"},{"id":"kb-coursemill-003","type":"kb","product":"coursemill","title":"CourseMill Administrator Guide","url":"https://knowledgebase.elblearning.com/coursemill-administrator-guide","body":"Comprehensive guide for CourseMill administrators covering system configuration, user management, course catalog setup, compliance tracking, and advanced reporting features.","sections":[{"heading":"System Configuration","anchor":"system-configuration","text":"Access the CourseMill admin panel to configure global settings. Manage email templates for notifications. Set password policies and session timeouts. Configure integration with external systems via API.","level":2,"paragraphs":[{"text":"Access the CourseMill admin panel to configure global settings. Manage email templates for notifications.","anchor":"system-configuration-p0"},{"text":"Set password policies and session timeouts. Configure integration with external systems via API.","anchor":"system-configuration-p1"}]},{"heading":"Course Catalog Management","anchor":"course-catalog-management","text":"Organize courses into categories and catalogs. Set course visibility and enrollment rules. Enable self-enrollment or restrict to admin-assigned only. Manage course versioning and retirement.","level":2,"paragraphs":[{"text":"Organize courses into categories and catalogs. Set course visibility and enrollment rules.","anchor":"course-catalog-management-p0"},{"text":"Enable self-enrollment or restrict to admin-assigned only. Manage course versioning and retirement.","anchor":"course-catalog-management-p1"}]}],"tags":["admin","configuration","lms","catalog","management","coursemill"],"solved":false,"updatedAt":"2026-02-10"},{"id":"kb-lectora-004","type":"kb","product":"lectora","title":"Status Action Conditions","url":"https://knowledgebase.elblearning.com/status-action-conditions","body":"Learn how to use status action conditions in Lectora to control course behavior based on completion states. Configure actions that fire only when specific conditions related to question status, page status, or variable values are met.","sections":[{"heading":"Understanding Status Conditions","anchor":"understanding-status-conditions","text":"Status conditions evaluate the state of an object before executing an action. Common conditions include checking whether a page has been visited, a test has been passed, or a specific variable has reached a threshold value.","level":2,"paragraphs":[{"text":"Status conditions evaluate the state of an object before executing an action.","anchor":"understanding-status-conditions-p0"},{"text":"Common conditions include checking whether a page has been visited, a test has been passed, or a specific variable has reached a threshold value.","anchor":"understanding-status-conditions-p1"}]},{"heading":"Configuring Action Conditions","anchor":"configuring-action-conditions","text":"Add conditions to any action by opening the Action Properties panel. Click Add Condition to define the evaluation criteria. Combine multiple conditions using AND/OR logic. Test your conditions in preview mode to verify correct behavior.","level":2,"paragraphs":[{"text":"Add conditions to any action by opening the Action Properties panel. Click Add Condition to define the evaluation criteria.","anchor":"configuring-action-conditions-p0"},{"text":"Combine multiple conditions using AND/OR logic. Test your conditions in preview mode to verify correct behavior.","anchor":"configuring-action-conditions-p1"}]}],"tags":["actions","conditions","variables","status","branching"],"solved":false,"updatedAt":"2026-02-10"},{"id":"kb-lectora-005","type":"kb","product":"lectora","title":"Trigger: Device Rotation and Variable: Current View","url":"https://knowledgebase.elblearning.com/trigger-device-rotation-and-variable-current-view","body":"Use the Device Rotation trigger and Current View variable in Lectora to create responsive interactions that adapt when a learner rotates their device between portrait and landscape orientations.","sections":[{"heading":"Device Rotation Trigger","anchor":"device-rotation-trigger","text":"The Device Rotation trigger fires automatically when the learner rotates their mobile device or tablet. Attach actions to this trigger to rearrange content, show or hide elements, or change layouts when orientation changes.","level":2,"paragraphs":[{"text":"The Device Rotation trigger fires automatically when the learner rotates their mobile device or tablet.","anchor":"device-rotation-trigger-p0"},{"text":"Attach actions to this trigger to rearrange content, show or hide elements, or change layouts when orientation changes.","anchor":"device-rotation-trigger-p1"}]},{"heading":"Current View Variable","anchor":"current-view-variable","text":"The Current View system variable stores the active responsive view name (Desktop, Tablet, or Mobile). Use this variable in conditions to execute actions only for specific device views. Combine with the Device Rotation trigger for full responsive control.","level":2,"paragraphs":[{"text":"The Current View system variable stores the active responsive view name (Desktop, Tablet, or Mobile).","anchor":"current-view-variable-p0"},{"text":"Use this variable in conditions to execute actions only for specific device views. Combine with the Device Rotation trigger for full responsive control.","anchor":"current-view-variable-p1"}]}],"tags":["trigger","device-rotation","variable","current-view","responsive","mobile"],"solved":false,"updatedAt":"2026-01-30"},{"id":"kb-lectora-006","type":"kb","product":"lectora","title":"Inline Variable Replacement","url":"https://knowledgebase.elblearning.com/inline-variable-replacement","body":"Display dynamic variable values directly within text blocks in Lectora. Use inline variable replacement to personalize content by showing the learner\u0027s name, score, date, or any custom variable value inside text elements.","sections":[{"heading":"Inserting a Variable into Text","anchor":"inserting-variable-into-text","text":"Place your cursor inside a text block where you want the variable value to appear. Go to Insert \u003e Variable Reference or type the variable name wrapped in the designated tokens. At runtime the token is replaced with the current variable value.","level":2,"paragraphs":[{"text":"Place your cursor inside a text block where you want the variable value to appear.","anchor":"inserting-variable-into-text-p0"},{"text":"Go to Insert \u003e Variable Reference or type the variable name wrapped in the designated tokens. At runtime the token is replaced with the current variable value.","anchor":"inserting-variable-into-text-p1"}]},{"heading":"Common Use Cases","anchor":"common-use-cases","text":"Display the learner\u0027s name on a welcome page. Show running quiz scores. Print certificate completion dates. Present personalized feedback based on variable values. All of these use inline variable replacement to dynamically update text.","level":2,"paragraphs":[{"text":"Display the learner\u0027s name on a welcome page. Show running quiz scores. Print certificate completion dates.","anchor":"common-use-cases-p0"},{"text":"Present personalized feedback based on variable values. All of these use inline variable replacement to dynamically update text.","anchor":"common-use-cases-p1"}]}],"tags":["variable","inline","replacement","text","personalization","dynamic"],"solved":false,"updatedAt":"2026-02-08"},{"id":"kb-lectora-007","type":"kb","product":"lectora","title":"Lectora Basics: Using User-Defined Variables","url":"https://knowledgebase.elblearning.com/lectora-basics-using-user-defined-variables","body":"Learn how to create and manage user-defined variables in Lectora. Variables let you store learner data, track progress, control navigation, and build personalized branching scenarios throughout your eLearning course.","sections":[{"heading":"Creating a Variable","anchor":"creating-a-variable","text":"Open the Variable Manager from the Tools menu. Click Add Variable. Choose the variable type: Text, Number, or Boolean. Give it a meaningful name and set an initial value. Variables are available globally across all pages in your title.","level":2,"paragraphs":[{"text":"Open the Variable Manager from the Tools menu. Click Add Variable. Choose the variable type: Text, Number, or Boolean.","anchor":"creating-a-variable-p0"},{"text":"Give it a meaningful name and set an initial value. Variables are available globally across all pages in your title.","anchor":"creating-a-variable-p1"}]},{"heading":"Using Variables in Actions","anchor":"using-variables-in-actions","text":"Modify variable values through actions. Use Set Variable to assign a value, Increment to increase a number, or Toggle to flip a boolean. Combine with conditions to create branching logic: if score \u003e= 80 then show certificate page.","level":2,"paragraphs":[{"text":"Modify variable values through actions. Use Set Variable to assign a value, Increment to increase a number, or Toggle to flip a boolean.","anchor":"using-variables-in-actions-p0"},{"text":"Combine with conditions to create branching logic: if score \u003e= 80 then show certificate page.","anchor":"using-variables-in-actions-p1"}]},{"heading":"Variable Scope and Persistence","anchor":"variable-scope-persistence","text":"User-defined variables persist for the duration of a session. To retain values across sessions, enable SCORM suspend data or use LMS bookmark variables. System variables like AICC_Score and AICC_Lesson_Status are automatically tracked by the LMS.","level":2,"paragraphs":[{"text":"User-defined variables persist for the duration of a session. To retain values across sessions, enable SCORM suspend data or use LMS bookmark variables.","anchor":"variable-scope-persistence-p0"},{"text":"System variables like AICC_Score and AICC_Lesson_Status are automatically tracked by the LMS.","anchor":"variable-scope-persistence-p1"}]}],"tags":["variables","user-defined","actions","branching","lectora-basics"],"solved":false,"updatedAt":"2026-02-12"},{"id":"kb-lectora-008","type":"kb","product":"lectora","title":"Lectora Basics: How to Use the Variable Manager","url":"https://knowledgebase.elblearning.com/lectora-basics-how-to-use-the-variable-manager","body":"The Variable Manager in Lectora provides a centralized interface for creating, editing, and organizing all variables in your title. Access it to review variable types, initial values, and usage throughout your course.","sections":[{"heading":"Accessing the Variable Manager","anchor":"accessing-variable-manager","text":"Open the Variable Manager from Tools \u003e Variable Manager or press Ctrl+Shift+V. The panel lists all variables in your title grouped by type. Filter by name or type to quickly locate specific variables.","level":2,"paragraphs":[{"text":"Open the Variable Manager from Tools \u003e Variable Manager or press Ctrl+Shift+V.","anchor":"accessing-variable-manager-p0"},{"text":"The panel lists all variables in your title grouped by type. Filter by name or type to quickly locate specific variables.","anchor":"accessing-variable-manager-p1"}]},{"heading":"Editing and Organizing Variables","anchor":"editing-organizing-variables","text":"Double-click a variable to edit its name, type, or initial value. Use the search bar to find variables by name. Delete unused variables to keep your project clean. The manager also shows where each variable is referenced, making it easy to track dependencies.","level":2,"paragraphs":[{"text":"Double-click a variable to edit its name, type, or initial value. Use the search bar to find variables by name.","anchor":"editing-organizing-variables-p0"},{"text":"Delete unused variables to keep your project clean. The manager also shows where each variable is referenced, making it easy to track dependencies.","anchor":"editing-organizing-variables-p1"}]}],"tags":["variable-manager","variables","tools","lectora-basics","organization"],"solved":false,"updatedAt":"2026-02-06"},{"id":"kb-lectora-009","type":"kb","product":"lectora","title":"Utilizing Pre-Tests in your Lectora Titles","url":"https://knowledgebase.elblearning.com/utilizing-pre-tests-in-your-lectora-titles","body":"Pre-tests allow you to assess learner knowledge before they begin a course module. Based on pre-test results, Lectora can skip content the learner already knows, creating an adaptive and efficient learning path.","sections":[{"heading":"Creating a Pre-Test","anchor":"creating-a-pre-test","text":"Insert a test at the beginning of your title or chapter. Mark it as a pre-test in the test properties. Add questions that map to specific content sections. Set passing thresholds to determine which sections a learner can skip.","level":2,"paragraphs":[{"text":"Insert a test at the beginning of your title or chapter. Mark it as a pre-test in the test properties.","anchor":"creating-a-pre-test-p0"},{"text":"Add questions that map to specific content sections. Set passing thresholds to determine which sections a learner can skip.","anchor":"creating-a-pre-test-p1"}]},{"heading":"Adaptive Navigation Based on Pre-Test Results","anchor":"adaptive-navigation","text":"Use pre-test score variables in actions and conditions to control navigation. If the learner passes the pre-test for a section, automatically skip that chapter. This creates a personalized learning path that respects existing knowledge.","level":2,"paragraphs":[{"text":"Use pre-test score variables in actions and conditions to control navigation.","anchor":"adaptive-navigation-p0"},{"text":"If the learner passes the pre-test for a section, automatically skip that chapter. This creates a personalized learning path that respects existing knowledge.","anchor":"adaptive-navigation-p1"}]}],"tags":["pre-test","test","assessment","adaptive","navigation","quiz"],"solved":false,"updatedAt":"2026-01-25"},{"id":"kb-lectora-010","type":"kb","product":"lectora","title":"Working with CSV Question Files","url":"https://knowledgebase.elblearning.com/working-with-csv-question-files","body":"Import quiz questions from CSV files into Lectora to speed up test creation. The CSV format supports multiple question types including multiple choice, true/false, matching, and fill-in-the-blank.","sections":[{"heading":"CSV File Format","anchor":"csv-file-format","text":"Structure your CSV with columns for question type, question text, answer options, correct answer, and feedback. Use the provided template to ensure proper formatting. Each row represents one question.","level":2,"paragraphs":[{"text":"Structure your CSV with columns for question type, question text, answer options, correct answer, and feedback.","anchor":"csv-file-format-p0"},{"text":"Use the provided template to ensure proper formatting. Each row represents one question.","anchor":"csv-file-format-p1"}]},{"heading":"Importing Questions","anchor":"importing-questions","text":"Go to File \u003e Import \u003e CSV Questions. Select your CSV file and map columns to question fields. Preview the imported questions before confirming. Lectora creates a test with all questions from the CSV automatically.","level":2,"paragraphs":[{"text":"Go to File \u003e Import \u003e CSV Questions. Select your CSV file and map columns to question fields.","anchor":"importing-questions-p0"},{"text":"Preview the imported questions before confirming. Lectora creates a test with all questions from the CSV automatically.","anchor":"importing-questions-p1"}]}],"tags":["csv","questions","import","test","quiz","assessment"],"solved":false,"updatedAt":"2026-01-20"},{"id":"kb-lectora-011","type":"kb","product":"lectora","title":"Custom Test Results","url":"https://knowledgebase.elblearning.com/custom-test-results","body":"Customize the test results page in Lectora to display personalized feedback, scores, pass/fail messages, and remediation paths based on learner performance.","sections":[{"heading":"Designing Results Pages","anchor":"designing-results-pages","text":"Edit the default test results page or create custom result pages. Display the score using the test score variable. Show pass or fail messages based on the threshold. Add a review button to let learners revisit incorrect answers.","level":2,"paragraphs":[{"text":"Edit the default test results page or create custom result pages. Display the score using the test score variable.","anchor":"designing-results-pages-p0"},{"text":"Show pass or fail messages based on the threshold. Add a review button to let learners revisit incorrect answers.","anchor":"designing-results-pages-p1"}]},{"heading":"Score-Based Branching","anchor":"score-based-branching","text":"Use the test score variable in conditions to create different paths. High scorers can skip remediation. Low scorers are routed to review content. Middle-range learners see targeted supplemental material. This creates a truly adaptive post-test experience.","level":2,"paragraphs":[{"text":"Use the test score variable in conditions to create different paths. High scorers can skip remediation.","anchor":"score-based-branching-p0"},{"text":"Low scorers are routed to review content. Middle-range learners see targeted supplemental material. This creates a truly adaptive post-test experience.","anchor":"score-based-branching-p1"}]}],"tags":["test","results","score","feedback","remediation","quiz"],"solved":false,"updatedAt":"2026-01-18"},{"id":"kb-lectora-012","type":"kb","product":"lectora","title":"Building a Drag and Drop Question with Lectora and Lectora Online","url":"https://knowledgebase.elblearning.com/building-a-drag-and-drop-question","body":"Create interactive drag and drop questions in Lectora to assess learner understanding through hands-on interactions. Drag and drop questions engage learners by requiring them to match, sort, or place items correctly.","sections":[{"heading":"Setting Up Drag Sources and Drop Targets","anchor":"drag-sources-drop-targets","text":"Insert objects as drag sources (items the learner drags) and drop targets (areas where items are placed). Assign correct pairings in the question properties. Each drag source can accept one or multiple correct targets.","level":2,"paragraphs":[{"text":"Insert objects as drag sources (items the learner drags) and drop targets (areas where items are placed).","anchor":"drag-sources-drop-targets-p0"},{"text":"Assign correct pairings in the question properties. Each drag source can accept one or multiple correct targets.","anchor":"drag-sources-drop-targets-p1"}]},{"heading":"Feedback and Scoring","anchor":"feedback-scoring","text":"Configure correct and incorrect feedback for each pairing. Set point values for accurate placements. Enable snap-to-target so items align perfectly when dropped. Add attempts limits and retry options for additional practice.","level":2,"paragraphs":[{"text":"Configure correct and incorrect feedback for each pairing. Set point values for accurate placements.","anchor":"feedback-scoring-p0"},{"text":"Enable snap-to-target so items align perfectly when dropped. Add attempts limits and retry options for additional practice.","anchor":"feedback-scoring-p1"}]}],"tags":["drag-and-drop","question","interaction","quiz","assessment"],"solved":false,"updatedAt":"2026-01-22"},{"id":"kb-lectora-013","type":"kb","product":"lectora","title":"Creating Randomized Tests in Lectora and Lectora Online","url":"https://knowledgebase.elblearning.com/creating-randomized-tests","body":"Randomize test questions in Lectora to prevent memorization and ensure assessment integrity. Configure question pools, random selection counts, and answer shuffling for a unique test experience each time.","sections":[{"heading":"Question Pools and Randomization","anchor":"question-pools-randomization","text":"Create a question pool by adding more questions than the test will display. Set the number of questions to randomly select from the pool. Each learner receives a unique subset. Answers within each question can also be shuffled.","level":2,"paragraphs":[{"text":"Create a question pool by adding more questions than the test will display. Set the number of questions to randomly select from the pool.","anchor":"question-pools-randomization-p0"},{"text":"Each learner receives a unique subset. Answers within each question can also be shuffled.","anchor":"question-pools-randomization-p1"}]}],"tags":["randomized","test","quiz","question-pool","assessment","shuffle"],"solved":false,"updatedAt":"2026-01-16"},{"id":"kb-lectora-014","type":"kb","product":"lectora","title":"Adding Web Windows in Lectora and Lectora Online","url":"https://knowledgebase.elblearning.com/adding-web-windows-in-lectora","body":"Embed external web content directly inside your Lectora course using Web Windows. Display live websites, web applications, Google Maps, embedded videos, or any URL-based content within a course page.","sections":[{"heading":"Inserting a Web Window","anchor":"inserting-web-window","text":"Go to Insert \u003e Web Window. Enter the target URL or embed code. Resize and position the web window on your page. The content loads live at runtime, so learners see the latest version of the external resource.","level":2,"paragraphs":[{"text":"Go to Insert \u003e Web Window. Enter the target URL or embed code.","anchor":"inserting-web-window-p0"},{"text":"Resize and position the web window on your page. The content loads live at runtime, so learners see the latest version of the external resource.","anchor":"inserting-web-window-p1"}]}],"tags":["web-window","embed","iframe","external-content","html"],"solved":false,"updatedAt":"2026-01-14"},{"id":"kb-lectora-015","type":"kb","product":"lectora","title":"Web Objects in Lectora and Lectora Online","url":"https://knowledgebase.elblearning.com/web-objects-in-lectora","body":"Use Web Objects to embed custom HTML, CSS, and JavaScript directly into your Lectora course. Web Objects give you full control to create custom interactions, integrate third-party widgets, and extend Lectora functionality.","sections":[{"heading":"Creating a Web Object","anchor":"creating-web-object","text":"Go to Insert \u003e Web Object. Provide an HTML folder or a single HTML file. The web object renders inside an iframe on the page. Use the Lectora JavaScript API to communicate between the web object and the parent course for tracking and variable exchange.","level":2,"paragraphs":[{"text":"Go to Insert \u003e Web Object. Provide an HTML folder or a single HTML file. The web object renders inside an iframe on the page.","anchor":"creating-web-object-p0"},{"text":"Use the Lectora JavaScript API to communicate between the web object and the parent course for tracking and variable exchange.","anchor":"creating-web-object-p1"}]}],"tags":["web-object","html","javascript","custom","embed","api"],"solved":false,"updatedAt":"2026-01-12"},{"id":"kb-lectora-016","type":"kb","product":"lectora","title":"How to Insert Custom HTML Into Lectora","url":"https://knowledgebase.elblearning.com/how-to-insert-custom-html-into-lectora","body":"Insert custom HTML snippets into Lectora to add specialized content such as embedded forms, interactive widgets, analytics tracking codes, or custom styled elements that go beyond built-in Lectora objects.","sections":[{"heading":"Adding Custom HTML","anchor":"adding-custom-html","text":"Use the HTML Extension object to inject raw HTML into a page. Go to Insert \u003e HTML Extension. Paste your HTML code in the editor. The code is rendered inline alongside other Lectora objects on the page.","level":2,"paragraphs":[{"text":"Use the HTML Extension object to inject raw HTML into a page. Go to Insert \u003e HTML Extension.","anchor":"adding-custom-html-p0"},{"text":"Paste your HTML code in the editor. The code is rendered inline alongside other Lectora objects on the page.","anchor":"adding-custom-html-p1"}]},{"heading":"Best Practices","anchor":"best-practices","text":"Keep custom HTML lightweight to avoid performance issues. Test in all target browsers. Avoid conflicting CSS styles with Lectora\u0027s built-in styles. Use external files for complex JavaScript to keep the HTML snippet clean.","level":2,"paragraphs":[{"text":"Keep custom HTML lightweight to avoid performance issues. Test in all target browsers.","anchor":"best-practices-p0"},{"text":"Avoid conflicting CSS styles with Lectora\u0027s built-in styles. Use external files for complex JavaScript to keep the HTML snippet clean.","anchor":"best-practices-p1"}]}],"tags":["html","custom","extension","embed","code","widget"],"solved":false,"updatedAt":"2026-01-10"},{"id":"comm-general-002","type":"community","product":"general","title":"The Brain Science Behind a Psychologically Safe Learning Environment","url":"https://community.elblearning.com/topics/the-brain-science-behind-a-psychologically-safe-learning-environment-f4449466?hsLang=en","body":"Explore the neuroscience of psychological safety in learning. Understand how the brain processes threat versus reward in training scenarios and why creating a safe environment leads to better retention, engagement, and knowledge transfer.","tags":["learning","psychology","brain-science","safety","retention","engagement"],"solved":false,"accepted":false,"replies":0,"views":156,"updatedAt":"2023-01-27"},{"id":"comm-general-003","type":"community","product":"general","title":"ELB Learning Wins Top Content Providers for Team building Training 2023","url":"https://community.elblearning.com/topics/elb-learning-wins-top-content-providers-for-team-building-training-2023-4cdd2750?hsLang=en","body":"ELB Learning has been recognized as a Top Content Provider for Team Building Training in 2023. This award highlights our commitment to creating collaborative, engaging, and impactful team-building learning experiences for organizations.","tags":["elb-learning","awards","team-building","training","content-providers","2023"],"solved":false,"accepted":false,"replies":0,"views":112,"updatedAt":"2022-11-21"},{"id":"comm-general-004","type":"community","product":"general","title":"6 Tips to Transform Performance \u0026 Boost ROI with Video","url":"https://community.elblearning.com/topics/join-don-schmidt-to-learn-6-tips-to-transform-performance-ampamp-boost-roi-with-video-fd947f18?hsLang=en","body":"Learn six practical tips for using video to transform employee performance and boost training ROI. Topics include video-based learning strategies, measuring video engagement, integrating video into existing training programs, and maximizing the impact of your video content investment.","tags":["video","roi","performance","training","tips","engagement","media"],"solved":false,"accepted":false,"replies":1,"views":89,"updatedAt":"2023-01-11"},{"id":"comm-general-005","type":"community","product":"general","title":"ELB Learning Wins Bronze Excellence in E-Learning Award in the 2022 Learning in Practice Awards","url":"https://community.elblearning.com/topics/elb-learning-wins-bronze-excellence-in-elearning-award-in-the-2022-learning-in-practice-awards-8425d159?hsLang=en","body":"ELB Learning has received the Bronze Excellence in E-Learning Award at the 2022 Learning in Practice Awards. This recognition celebrates our innovative eLearning solutions and commitment to advancing the learning technology industry.","tags":["elb-learning","awards","excellence","elearning","recognition","2022"],"solved":false,"accepted":false,"replies":0,"views":74,"updatedAt":"2022-11-08"},{"id":"comm-general-006","type":"community","product":"general","title":"ELB Learning wins Top Blended Learning Content Providers for 2023","url":"https://community.elblearning.com/topics/elb-learning-wins-top-blended-learning-content-providers-for-2023-a22d5d06?hsLang=en","body":"ELB Learning is recognized as a Top Blended Learning Content Provider for 2023. Blended learning combines online digital media with traditional classroom methods, and ELB Learning\u0027s suite of tools supports both synchronous and asynchronous learning experiences.","tags":["elb-learning","awards","blended-learning","content-providers","2023"],"solved":false,"accepted":false,"replies":0,"views":67,"updatedAt":"2022-10-31"},{"id":"comm-general-007","type":"community","product":"general","title":"Recently Released eBooks and Infographics | February 2026","url":"https://community.elblearning.com/topics/recently-released-ebooks-and-infographics-february-2026-ml7z2c9r?hsLang=en","body":"Check out the latest eBooks and infographics released by ELB Learning. These resources cover topics including eLearning best practices, instructional design strategies, gamification in training, VR learning, and microlearning trends for 2026.","tags":["ebooks","infographics","resources","elearning","instructional-design","2026"],"solved":false,"accepted":false,"replies":0,"views":45,"updatedAt":"2026-02-04"},{"id":"comm-general-008","type":"community","product":"general","title":"Upcoming Webinars \u0026 Events | February 2026","url":"https://community.elblearning.com/topics/upcoming-webinars-and-events-february-2026-ml7ypecs?hsLang=en","body":"Join upcoming webinars and events hosted by ELB Learning. Topics include authoring tips for Lectora, immersive VR experiences with CenarioVR, gamification strategies with The Training Arcade, and LMS best practices with Rockstar Learning Platform.","tags":["webinars","events","training","lectora","cenariovr","gamification","arcade","training-arcade","2026"],"solved":false,"accepted":false,"replies":0,"views":38,"updatedAt":"2026-02-04"},{"id":"comm-general-009","type":"community","product":"general","title":"Summary of Recent Blog Posts | January 2026","url":"https://community.elblearning.com/topics/summary-of-recent-blog-posts-january-2026-ml7ywtf1?hsLang=en","body":"A roundup of recent blog posts from ELB Learning covering topics such as AI in eLearning, accessibility compliance, SCORM vs xAPI, mobile learning design, video-based training, and content authoring tips for Lectora and MicroBuilder.","tags":["blog","summary","ai","accessibility","scorm","xapi","mobile-learning","2026"],"solved":false,"accepted":false,"replies":0,"views":52,"updatedAt":"2026-02-04"},{"id":"comm-general-010","type":"community","product":"general","title":"Summary of Recent Blog Posts | December 2025","url":"https://community.elblearning.com/topics/summary-of-recent-blog-posts-december-2025-mk2jy77r?hsLang=en","body":"Catch up on the latest blog posts from December 2025. Topics include year-in-review for eLearning trends, new features in Lectora Online, CenarioVR updates, and how organizations are leveraging The Training Arcade for employee engagement.","tags":["blog","summary","elearning","trends","lectora-online","cenariovr","arcade","training-arcade","2025"],"solved":false,"accepted":false,"replies":0,"views":61,"updatedAt":"2026-01-06"},{"id":"comm-general-011","type":"community","product":"general","title":"Upcoming Webinars \u0026 Events | January 2026","url":"https://community.elblearning.com/topics/upcoming-webinars-and-events-january-2026-mk2jrlvb?hsLang=en","body":"Don\u0027t miss upcoming webinars and live events in January 2026. Sessions cover Lectora advanced techniques, CenarioVR immersive scenario building, ReviewLink collaboration workflows, and CourseMill LMS administration tips.","tags":["webinars","events","lectora","cenariovr","reviewlink","coursemill","2026"],"solved":false,"accepted":false,"replies":0,"views":43,"updatedAt":"2026-01-06"},{"id":"comm-coursemill-001","type":"community","product":"coursemill","title":"CourseMill LMS Tips: Managing Large User Groups","url":"https://community.elblearning.com/topics/coursemill-lms-tips-managing-large-user-groups-mk3abc01?hsLang=en","body":"Best practices for managing large user groups in CourseMill. Tips on bulk CSV imports, department-based assignments, automated enrollment rules, and efficient reporting for organizations with thousands of learners.","tags":["coursemill","lms","users","groups","management","tips"],"solved":true,"accepted":true,"solutionText":"Use the Department Auto-Assign feature in CourseMill Admin \u003e Settings \u003e Enrollment Rules. Create rules that automatically enroll users into courses based on their department or role. Combined with CSV bulk import, this handles thousands of users efficiently.","replies":12,"views":234,"updatedAt":"2026-02-10"},{"id":"comm-coursemill-002","type":"community","product":"coursemill","title":"Getting Started with CourseMill: Common Setup Questions","url":"https://community.elblearning.com/topics/getting-started-coursemill-common-setup-questions-mk3def02?hsLang=en","body":"A collection of frequently asked questions about getting started with CourseMill LMS. Covers initial configuration, SSO setup, SCORM upload troubleshooting, and dashboard customization for new administrators.","tags":["coursemill","getting-started","setup","faq","lms","admin"],"solved":true,"accepted":true,"solutionText":"For initial CourseMill setup: 1) Log into admin console 2) Go to Settings \u003e Organization to set branding 3) Configure authentication under Settings \u003e SSO 4) Upload courses via Content \u003e Add Course 5) Create user groups under Users \u003e Groups. The Getting Started with CourseMill KB article covers each step in detail.","replies":8,"views":189,"updatedAt":"2026-02-15"},{"id":"kb-lectora-017","type":"kb","product":"lectora","title":"Branching Scenarios Made Easy With Lectora Online","url":"https://knowledgebase.elblearning.com/branching-scenarios-made-easy-with-lectora-online","body":"Create engaging branching scenarios in Lectora Online. Design decision-based learning paths where learners choose their own route through content. Configure branching logic with variables and actions.","sections":[{"heading":"Setting Up Branching Logic","anchor":"setting-up-branching-logic","text":"Create decision points where learners choose between options. Each choice leads to a different content path. Use variables to track decisions and actions to navigate between branches.","level":2,"paragraphs":[{"text":"Create decision points where learners choose between options. Each choice leads to a different content path.","anchor":"setting-up-branching-logic-p0"},{"text":"Use variables to track decisions and actions to navigate between branches.","anchor":"setting-up-branching-logic-p1"}]}],"tags":["lectora","branching","scenarios","interactive"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-018","type":"kb","product":"lectora","title":"Creating Software Simulations in Lectora and Lectora Online","url":"https://knowledgebase.elblearning.com/creating-software-simulations-in-lectora-and-lectora-online","body":"Build software simulations in Lectora to train users on application workflows. Capture screenshots, add interactive hotspots, and create guided walkthroughs.","sections":[{"heading":"Capturing and Setting Up Screens","anchor":"capturing-setting-up-screens","text":"Import screenshots of the application you\u0027re training on. Add clickable hotspots over interface elements. Create step-by-step guides that mirror the actual software workflow.","level":2,"paragraphs":[{"text":"Import screenshots of the application you\u0027re training on. Add clickable hotspots over interface elements.","anchor":"capturing-setting-up-screens-p0"},{"text":"Create step-by-step guides that mirror the actual software workflow.","anchor":"capturing-setting-up-screens-p1"}]}],"tags":["lectora","simulation","software-training","interactive"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-019","type":"kb","product":"lectora","title":"Converting a Classroom Video Quick Win Tutorial","url":"https://knowledgebase.elblearning.com/converting-a-classroom-video-quick-win-tutorial","body":"Quick tutorial on converting classroom video content into interactive eLearning with Lectora. Transform recorded training sessions into engaging digital courses.","tags":["lectora","video","tutorial","conversion","quick-win"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-020","type":"kb","product":"lectora","title":"Getting Started with Tests Quick Win Tutorial","url":"https://knowledgebase.elblearning.com/getting-started-with-tests-quick-win-tutorial","body":"Quick tutorial for creating tests and assessments in Lectora. Learn the basics of adding questions, setting pass scores, and providing feedback.","tags":["lectora","quiz","test","tutorial","quick-win","assessment"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-021","type":"kb","product":"lectora","title":"Adding Style \u0026 Interactivity Quick Win Tutorial","url":"https://knowledgebase.elblearning.com/adding-style-interactivity-quick-win-tutorial","body":"Quick tutorial on enhancing your Lectora courses with visual styles and interactive elements. Add animations, transitions, hover effects, and clickable interactions.","tags":["lectora","interactivity","style","tutorial","quick-win"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-022","type":"kb","product":"lectora","title":"Getting Started in Lectora Online Quick Win Tutorial","url":"https://knowledgebase.elblearning.com/getting-started-in-lectora-online-quick-win-tutorial","body":"Quick tutorial for getting started with Lectora Online. Learn the workspace, create your first page, add content, and preview your course.","tags":["lectora","getting-started","tutorial","quick-win","lectora-online"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-023","type":"kb","product":"lectora","title":"Configuring the Image Editor Icon on the Tools Menu in Lectora Desktop","url":"https://knowledgebase.elblearning.com/configuring-the-image-icon-on-the-tools-menu-in-lectora-desktop","body":"Configure the image editor shortcut on the Lectora Desktop Tools menu. Set your preferred image editing application for quick access.","tags":["lectora","image","tools","configuration","lectora-desktop"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-024","type":"kb","product":"lectora","title":"Responsive Course Design (RCD) in Lectora Online","url":"https://knowledgebase.elblearning.com/introduction-to-responsive-course-design-rcd-in-lectora-online","body":"Introduction to Responsive Course Design in Lectora Online. Learn how RCD automatically adjusts content layout for desktop, tablet, and mobile views.","tags":["lectora","responsive","rcd","mobile","lectora-online"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-025","type":"kb","product":"lectora","title":"Publishing (SCORM, AICC, HTML)","url":"https://knowledgebase.elblearning.com/19.-publishing-scorm-aicc-html","body":"Comprehensive guide to publishing options in Lectora. Choose between SCORM 1.2, SCORM 2004, AICC, xAPI, and HTML5 output formats for your LMS.","tags":["lectora","publish","scorm","aicc","html"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-026","type":"kb","product":"lectora","title":"Work Modes in Lectora","url":"https://knowledgebase.elblearning.com/18.-work-modes","body":"Learn about different work modes in Lectora Online including Edit Mode, Preview Mode, and collaboration features for team-based course development.","tags":["lectora","work-modes","collaboration"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-027","type":"kb","product":"lectora","title":"Test and Questions in Lectora","url":"https://knowledgebase.elblearning.com/17.-test-and-questions","body":"Create tests and quiz questions in Lectora. Add multiple choice, true/false, matching, fill-in-the-blank, drag-and-drop, and short answer question types.","tags":["lectora","quiz","test","assessment","questions"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-028","type":"kb","product":"lectora","title":"Variables in Lectora","url":"https://knowledgebase.elblearning.com/16.-variables","body":"Learn about variables in Lectora. Store and manipulate learner data using text, number, and boolean variables to create dynamic, personalized courses.","tags":["lectora","variable","variables"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-029","type":"kb","product":"lectora","title":"Menu, Status Indicators, Progress Bar in Lectora","url":"https://knowledgebase.elblearning.com/15.-menu-status-indicators-progress-bar","body":"Configure the course menu, status indicators, and progress bars in Lectora to give learners clear navigation and progress tracking.","tags":["lectora","menu","progress","navigation"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-030","type":"kb","product":"lectora","title":"Media Library in Lectora","url":"https://knowledgebase.elblearning.com/14.-media-library","body":"Access and manage the media library in Lectora Online. Browse stock images, icons, characters, and templates. Upload your own media assets.","tags":["lectora","media","library","assets"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-031","type":"kb","product":"lectora","title":"Actions in Lectora","url":"https://knowledgebase.elblearning.com/13.-actions","body":"Master actions in Lectora to add interactivity. Configure triggers, conditions, and responses to create dynamic course behavior.","tags":["lectora","action","actions","interactive"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-032","type":"kb","product":"lectora","title":"Buttons in Lectora","url":"https://knowledgebase.elblearning.com/12.-buttons","body":"Create and customize buttons in Lectora. Set button states (normal, hover, active, disabled), add actions, and style with colors and images.","tags":["lectora","buttons","interactive","ui"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-033","type":"kb","product":"lectora","title":"Shapes and Lines in Lectora","url":"https://knowledgebase.elblearning.com/11.-shapes-and-lines","body":"Add shapes, lines, and geometric elements to your Lectora courses. Customize colors, borders, shadows, and use shapes as interactive containers.","tags":["lectora","shapes","design"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-034","type":"kb","product":"lectora","title":"Audio and Video in Lectora","url":"https://knowledgebase.elblearning.com/10.-audio-and-video","body":"Add audio and video to your Lectora courses. Support for MP3, MP4, WAV, and streaming formats. Configure autoplay, controls, and synchronized events.","tags":["lectora","video","audio","media"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-035","type":"kb","product":"lectora","title":"Characters in Lectora","url":"https://knowledgebase.elblearning.com/9.-characters","body":"Use character images in your Lectora courses to add a human element. Browse the character library, customize poses, and create engaging narrator-guided experiences.","tags":["lectora","characters","media","design"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-036","type":"kb","product":"lectora","title":"Images in Lectora","url":"https://knowledgebase.elblearning.com/8.-images","body":"Work with images in Lectora. Insert, resize, crop, and apply effects to images. Support for JPG, PNG, GIF, and SVG formats.","tags":["lectora","image","media"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-037","type":"kb","product":"lectora","title":"Table of Contents in Lectora","url":"https://knowledgebase.elblearning.com/7.-table-of-contents","body":"Configure the table of contents and course menu in Lectora. Set page titles, nesting, visibility, and learner navigation options.","tags":["lectora","navigation","menu","toc"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-038","type":"kb","product":"lectora","title":"Text and Links in Lectora","url":"https://knowledgebase.elblearning.com/6.-text-and-links","body":"Add and format text blocks in Lectora. Create hyperlinks to pages, URLs, or actions. Apply styles, fonts, and accessibility settings to text elements.","tags":["lectora","text","links","formatting"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-039","type":"kb","product":"lectora","title":"Chapters, Sections and Pages in Lectora","url":"https://knowledgebase.elblearning.com/5.-chapters-sections-and-pages","body":"Organize your Lectora course with chapters, sections, and pages. Configure hierarchy, navigation flow, and structural elements for well-organized courses.","tags":["lectora","structure","navigation"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-040","type":"kb","product":"lectora","title":"Design Ribbon in Lectora","url":"https://knowledgebase.elblearning.com/4.-designing-your-title","body":"Use the Design Ribbon in Lectora to customize the visual appearance of your course. Set backgrounds, colors, fonts, and global design properties.","tags":["lectora","design","ui","ribbon"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-041","type":"kb","product":"lectora","title":"Inheritance in Lectora","url":"https://knowledgebase.elblearning.com/3.4","body":"Understand object inheritance in Lectora. Objects placed on parent elements (like chapters) automatically appear on child elements (pages), allowing reuse of common elements.","tags":["lectora","inheritance","structure"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-042","type":"kb","product":"lectora","title":"Modular Development (ModDev) in Lectora","url":"https://knowledgebase.elblearning.com/moddev","body":"Use Modular Development in Lectora to build courses efficiently. Choose frameworks, themes, style packs, and page templates for rapid course assembly.","sections":[{"heading":"Course Frameworks","anchor":"course-frameworks","text":"Select a pre-built course framework that provides navigation, menu structure, and page layouts. Frameworks handle the structural foundation so you focus on content.","level":2},{"heading":"Themes and Style Packs","anchor":"themes-style-packs","text":"Apply visual themes and style packs to change colors, fonts, and design elements across your entire course at once.","level":2}],"tags":["lectora","modular","framework","template"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-043","type":"kb","product":"lectora","title":"Custom Fonts in Lectora Desktop","url":"https://knowledgebase.elblearning.com/custom-fonts-in-lectora-desktop","body":"Add custom fonts to Lectora Desktop courses. Include web fonts or embed font files for consistent typography across devices.","tags":["lectora","fonts","design","lectora-desktop"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-044","type":"kb","product":"lectora","title":"Setting Completion Variables in Lectora for SCORM","url":"https://knowledgebase.elblearning.com/setting-completion-variables-in-lectora-for-scorm-1.2-and-scorm-2004-published-courses","body":"Configure SCORM completion variables in Lectora to properly report course status to your LMS. Set completion criteria, pass/fail thresholds, and bookmark data.","sections":[{"heading":"SCORM 1.2 Completion","anchor":"scorm-12-completion","text":"Use the AICC_Lesson_Status variable to report completion. Set it to \u0027completed\u0027 or \u0027passed\u0027 when the learner meets your criteria.","level":2},{"heading":"SCORM 2004 Completion","anchor":"scorm-2004-completion","text":"SCORM 2004 separates completion from success. Use cmi.completion_status and cmi.success_status for granular tracking.","level":2}],"tags":["lectora","scorm","publish","lms","variable"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-045","type":"kb","product":"lectora","title":"Migrating to Lectora Online from Lectora Desktop","url":"https://knowledgebase.elblearning.com/migrating-to-lectora-online-from-lectora-desktop","body":"Guide to migrating your courses from Lectora Desktop to Lectora Online. Export, import, and adjust settings for the cloud-based authoring environment.","tags":["lectora","migration","lectora-online","lectora-desktop"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-046","type":"kb","product":"lectora","title":"Best Practices for Responsive Course Design (RCD)","url":"https://knowledgebase.elblearning.com/best-practices-for-responsive-course-design-rcd","body":"Best practices for creating responsive courses in Lectora. Design tips for optimal rendering on desktop, tablet, and mobile screens.","tags":["lectora","responsive","rcd","mobile","best-practices"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-047","type":"kb","product":"lectora","title":"How to Convert Flash Content in Lectora Titles","url":"https://knowledgebase.elblearning.com/how-to-convert-flash-content-in-your-lectora-titles","body":"Convert legacy Flash content in Lectora titles to modern HTML5 format. Remove Flash dependencies and update interactions for current browsers.","tags":["lectora","flash","html","conversion"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-048","type":"kb","product":"lectora","title":"SCORM 101 and a Lectora How-To","url":"https://knowledgebase.elblearning.com/scorm-101-and-a-lectora-how-to","body":"Learn SCORM fundamentals and how to publish SCORM-compliant courses in Lectora. Covers SCORM 1.2 and SCORM 2004 standards, tracking, and LMS integration.","sections":[{"heading":"What is SCORM?","anchor":"what-is-scorm","text":"SCORM (Sharable Content Object Reference Model) is a standard for eLearning interoperability. It defines how course content communicates with an LMS for tracking completion, scores, and bookmarking.","level":2},{"heading":"Publishing SCORM in Lectora","anchor":"publishing-scorm-lectora","text":"Select File \u003e Publish and choose SCORM 1.2 or SCORM 2004. Configure the manifest metadata, test identifiers, and tracking variables before publishing.","level":2}],"tags":["lectora","scorm","lms","getting-started"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-049","type":"kb","product":"lectora","title":"Using Templates in Lectora","url":"https://knowledgebase.elblearning.com/using-templates","body":"Browse and apply templates in Lectora for rapid course creation. Customize pre-built page layouts, interactions, and design elements.","tags":["lectora","template","layout","design"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-050","type":"kb","product":"lectora","title":"SCORM: The Basics and Beyond","url":"https://knowledgebase.elblearning.com/scorm-the-basics-and-beyond","body":"Deep dive into SCORM standards and advanced implementation in Lectora. Covers manifest files, SCO structure, API calls, and debugging LMS communication.","tags":["lectora","scorm","lms","advanced"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-051","type":"kb","product":"lectora","title":"Lectora Basics: Why Disinheritance Could Save Your eLearning","url":"https://knowledgebase.elblearning.com/lectora-basics-why-disinheritance-could-save-your-elearning","body":"Learn when and how to use disinheritance in Lectora to prevent inherited objects from appearing on specific pages. Essential for complex course structures.","tags":["lectora","inheritance","structure","lectora-basics"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-052","type":"kb","product":"lectora","title":"Grouping Objects and Actions in Lectora","url":"https://knowledgebase.elblearning.com/grouping-objects-and-actions-in-lectora-and-lectora-online","body":"Group objects and actions in Lectora for efficient course organization. Move, copy, and manage grouped elements as a single unit.","tags":["lectora","grouping","organization"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-053","type":"kb","product":"lectora","title":"PowerPoint Import Pre-flight Checklist","url":"https://knowledgebase.elblearning.com/powerpoint-import-pre-flight-checklist","body":"Checklist to prepare your PowerPoint presentation for import into Lectora. Ensure formatting, animations, and content transfer correctly.","tags":["lectora","powerpoint","import","checklist"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-054","type":"kb","product":"lectora","title":"Using Text Styles in Lectora","url":"https://knowledgebase.elblearning.com/using-text-styles-in-lectora-and-lectora-online","body":"Create and apply text styles in Lectora for consistent formatting across your course. Define styles for headings, body text, captions, and more.","tags":["lectora","text","styles","formatting"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-055","type":"kb","product":"lectora","title":"Lectora Online and Desktop: Superior SVG Image Support","url":"https://knowledgebase.elblearning.com/elevate-your-elearning-with-svg-support-in-lectora","body":"Use SVG images in Lectora for crisp, scalable graphics on any device. SVG support enables resolution-independent icons, illustrations, and diagrams.","tags":["lectora","svg","image","responsive"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-056","type":"kb","product":"lectora","title":"Customize Button States in Lectora","url":"https://knowledgebase.elblearning.com/customize-button-states-in-lectora-and-lectora-online","body":"Customize button states in Lectora: Normal, Hover, Down, and Disabled states. Create visually engaging buttons with state-specific styling.","tags":["lectora","buttons","interactive","ui","design"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-057","type":"kb","product":"lectora","title":"Lectora Basics: What Is a Variable","url":"https://knowledgebase.elblearning.com/lectora-basics-what-is-a-variable","body":"Introduction to variables in Lectora. Understand what variables are, their types (Text, Number, Boolean), and how they enable dynamic course behavior.","tags":["lectora","variable","lectora-basics","getting-started"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-058","type":"kb","product":"lectora","title":"Lectora Basics: About Question Variables","url":"https://knowledgebase.elblearning.com/lectora-basics-about-question-variables","body":"Learn about auto-created question variables in Lectora. Each test question generates variables for the answer, score, attempts, and status.","tags":["lectora","variable","quiz","questions","lectora-basics"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-059","type":"kb","product":"lectora","title":"How to Synchronize Events in Lectora","url":"https://knowledgebase.elblearning.com/how-to-synchronize-events-in-lectora-and-lectora-online-1","body":"Synchronize events in Lectora to coordinate animations, audio, video, and actions. Create timeline-based interactions with precise timing control.","tags":["lectora","synchronize","events","timeline","animation"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-060","type":"kb","product":"lectora","title":"Publish to SCORM or HTML","url":"https://knowledgebase.elblearning.com/publish-to-scorm-or-html","body":"Step-by-step guide to publishing Lectora courses as SCORM packages or standalone HTML. Configure output settings, test locally, and upload to your LMS.","tags":["lectora","publish","scorm","html"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-061","type":"kb","product":"lectora","title":"How To Resolve LMSSetValue errors in a SCORM Course","url":"https://knowledgebase.elblearning.com/how-to-resolve-lmssetvalue-errors-in-a-scorm-course","body":"Troubleshoot and resolve LMSSetValue errors in SCORM courses published from Lectora. Common causes include incorrect data types and exceeding field limits.","tags":["lectora","scorm","lms","troubleshooting","error"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-062","type":"kb","product":"lectora","title":"Lectora Publishing to Docebo","url":"https://knowledgebase.elblearning.com/lectora-publishing-to-docebo","body":"Configure Lectora publishing settings for Docebo LMS. Ensure proper SCORM compliance and tracking for courses deployed on the Docebo platform.","tags":["lectora","publish","docebo","lms"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-063","type":"kb","product":"lectora","title":"How to Export Your Title for Sharing","url":"https://knowledgebase.elblearning.com/how-to-export-your-title-for-sharing","body":"Export Lectora titles for sharing with other Lectora users. Create AWT packages that preserve all course elements for import into another Lectora installation.","tags":["lectora","export","sharing"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-064","type":"kb","product":"lectora","title":"Scale Published Content","url":"https://knowledgebase.elblearning.com/scale-published-content","body":"Configure scaling options for published Lectora courses. Ensure content displays correctly at various browser window sizes and resolutions.","tags":["lectora","publish","scaling","responsive"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-065","type":"kb","product":"lectora","title":"Accessibility: How to Order Title Objects in Lectora","url":"https://knowledgebase.elblearning.com/accessibility-how-to-order-title-objects-in-lectora","body":"Set the reading order of objects in Lectora for screen reader accessibility. Proper tab order ensures assistive technology users can navigate content logically.","tags":["lectora","accessibility","wcag"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-066","type":"kb","product":"lectora","title":"Tips and Tricks for Developing a 508 / WCAG Compliant Course","url":"https://knowledgebase.elblearning.com/tips-and-tricks-for-developing-a-508-/-wcag-compliant-course","body":"Best practices for creating Section 508 and WCAG compliant eLearning courses in Lectora. Covers alt text, color contrast, keyboard navigation, and ARIA attributes.","tags":["lectora","accessibility","wcag","508","compliance"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-067","type":"kb","product":"lectora","title":"How to Use Lectora to Create Accessible Courses","url":"https://knowledgebase.elblearning.com/how-to-use-lectora-to-create-accessible-courses","body":"Step-by-step guide to creating accessible eLearning courses with Lectora. Use built-in accessibility tools, testing features, and publishing settings.","tags":["lectora","accessibility","getting-started"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-068","type":"kb","product":"lectora","title":"Lectora Online Collaboration Features Training Plan","url":"https://knowledgebase.elblearning.com/lectora-online-collaboration-features-training-plan-everything-you-need-to-know","body":"Master collaboration features in Lectora Online. Share titles, assign tasks, track reviews, and work simultaneously with team members on course projects.","tags":["lectora","collaboration","lectora-online","teamwork"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-069","type":"kb","product":"lectora","title":"Containing Your Containers: Custom JavaScript Suggestions for Lectora Online","url":"https://knowledgebase.elblearning.com/containing-your-containers-custom-javascript-suggestions-for-lectora-online","body":"Best practices for using custom JavaScript in Lectora Online. Avoid scope conflicts, manage container elements, and integrate external libraries safely.","tags":["lectora","javascript","programming","advanced"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-070","type":"kb","product":"lectora","title":"How Can I Manipulate Lectora User Variables in JavaScript?","url":"https://knowledgebase.elblearning.com/how-can-i-use-user-variables-in-javascript","body":"Access and modify Lectora user variables from JavaScript. Use the Lectora JavaScript API to read, set, and manipulate variable values programmatically.","tags":["lectora","javascript","variable","programming","api"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-071","type":"kb","product":"lectora","title":"Extending Your Lectora Project with JavaScript and CSS","url":"https://knowledgebase.elblearning.com/extending-your-lectora-project-with-javascript-and-css","body":"Add custom JavaScript and CSS to extend Lectora course functionality. Inject scripts, style elements, and create custom interactions beyond built-in features.","tags":["lectora","javascript","css","programming","advanced"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-072","type":"kb","product":"lectora","title":"Utilizing Generative AI Features in Lectora Online","url":"https://knowledgebase.elblearning.com/utilizing-generative-ai-features-in-lectora","body":"Use Lectora Online\u0027s generative AI features to accelerate course creation. AI-powered text generation, content suggestions, and automated question creation.","tags":["lectora","ai","generative","lectora-online"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-073","type":"kb","product":"lectora","title":"Lectora System Requirements","url":"https://knowledgebase.elblearning.com/lectora-system-requirements","body":"System requirements for installing and running Lectora Desktop and Lectora Online. Covers supported operating systems, browsers, hardware, and network requirements.","tags":["lectora","system-requirements","installation"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-074","type":"kb","product":"lectora","title":"How Lectora License Keys and Activation Work","url":"https://knowledgebase.elblearning.com/how-lectora-license-keys-and-activation-work","body":"Understand Lectora licensing and activation. Covers license types, activation process, deactivation, and transferring licenses between computers.","tags":["lectora","license","activation"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-075","type":"kb","product":"lectora","title":"The Guide to Translation in Lectora","url":"https://knowledgebase.elblearning.com/the-guide-to-translation-in-lectora-and-lectora-online","body":"Export and import translations in Lectora for multilingual course delivery. Use the translation workflow to create courses in multiple languages.","tags":["lectora","translation","localization","multilingual"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-lectora-076","type":"kb","product":"lectora","title":"Lectora Desktop Version 21 Release Notes","url":"https://knowledgebase.elblearning.com/lectora-desktop-version-21-release-notes","body":"Release notes for Lectora Desktop version 21. New features, improvements, and bug fixes for the latest Lectora Desktop release.","tags":["lectora","release-notes","lectora-desktop"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-cenariovr-002","type":"kb","product":"cenariovr","title":"Resources: CenarioVR","url":"https://knowledgebase.elblearning.com/cenariovr-resources","body":"CenarioVR resource library with tutorials, guides, templates, and best practices for creating immersive VR learning experiences.","tags":["cenariovr","vr","resources"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-cenariovr-003","type":"kb","product":"cenariovr","title":"Best Practices: For Creating 360 Degree Video","url":"https://knowledgebase.elblearning.com/best-practices-for-creating-360-degree-video","body":"Best practices for capturing and producing 360-degree video for VR learning. Covers camera selection, filming techniques, stitching, and optimization.","tags":["cenariovr","vr","360","video","best-practices"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-cenariovr-004","type":"kb","product":"cenariovr","title":"Quick Guide: Navigating CenarioVR\u0027s Dashboard","url":"https://knowledgebase.elblearning.com/navigating-cenariovrs-dashboard","body":"Navigate the CenarioVR dashboard to manage projects, access templates, configure settings, and publish VR experiences.","tags":["cenariovr","vr","dashboard","getting-started"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-cenariovr-005","type":"kb","product":"cenariovr","title":"CenarioVR Release Notes","url":"https://knowledgebase.elblearning.com/cenariovr-release-notes","body":"Stay up to date with CenarioVR platform updates. Release notes cover new VR authoring features, scene editor improvements, publishing updates, and bug fixes.","tags":["cenariovr","vr","release-notes"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-training-arcade-002","type":"kb","product":"training-arcade","title":"Resources: Game Overview Videos","url":"https://knowledgebase.elblearning.com/game-videos","body":"Watch overview videos for each Training Arcade game template. See how trivia, memory match, word search, and other game types work.","tags":["training-arcade","game","video","resources"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-training-arcade-003","type":"kb","product":"training-arcade","title":"How to Add Video, Audio, and Advanced Feedback to Training Games","url":"https://knowledgebase.elblearning.com/how-to-add-video-audio-and-advanced-feedback-to-your-training-games","body":"Enhance Training Arcade games with video, audio, and advanced feedback. Add multimedia content to questions, answers, and feedback screens.","tags":["training-arcade","game","video","audio","feedback"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-training-arcade-004","type":"kb","product":"training-arcade","title":"How do I add Training Arcade games to my LMS?","url":"https://knowledgebase.elblearning.com/how-do-i-add-the-training-arcade-games-to-my-lms","body":"Step-by-step guide to adding Training Arcade games to your LMS. Export SCORM packages, configure tracking, and deploy games for learners.","tags":["training-arcade","game","lms","scorm","publish"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-microbuilder-002","type":"kb","product":"microbuilder","title":"Questions and Quizzes in MicroBuilder","url":"https://knowledgebase.elblearning.com/creating-questions-and-quizzes-in-microbuilder","body":"Create questions and quizzes in MicroBuilder. Add multiple choice, true/false, and open-ended questions to your microlearning modules.","tags":["microbuilder","quiz","questions","microlearning"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-microbuilder-003","type":"kb","product":"microbuilder","title":"AI-assisted Content Generation in MicroBuilder","url":"https://knowledgebase.elblearning.com/ai-assisted-content-generation-in-microbuilder","body":"Use MicroBuilder\u0027s AI assistant to generate learning content from topics or existing text. Create structured modules with auto-generated questions and summaries.","tags":["microbuilder","ai","content-creation","microlearning"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-microbuilder-004","type":"kb","product":"microbuilder","title":"Publish Your Microlearning Module in MicroBuilder","url":"https://knowledgebase.elblearning.com/publish-your-microlearning-module-in-microbuilder","body":"Publish microlearning modules from MicroBuilder as web links, SCORM packages, or embed codes. Share via email, LMS, or direct URL.","tags":["microbuilder","publish","microlearning","scorm"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-rockstar-002","type":"kb","product":"rockstar","title":"Rockstar Learning Platform Domain Permissions","url":"https://knowledgebase.elblearning.com/rockstar-learning-platform-domains-to-whitelist","body":"Domain allowlist for the Rockstar Learning Platform. Configure your firewall and email filters to allow these domains for proper platform operation.","tags":["rockstar","lms","configuration","security"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-rockstar-003","type":"kb","product":"rockstar","title":"Rockstar Learning Platform Feature Requests","url":"https://knowledgebase.elblearning.com/rockstar-learning-platform-feature-requests","body":"Submit and vote on feature requests for the Rockstar Learning Platform. Help shape the future roadmap of the LMS.","tags":["rockstar","lms","feature-request","feedback"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-rockstar-004","type":"kb","product":"rockstar","title":"Navigating the User Module Page","url":"https://knowledgebase.elblearning.com/module-page","body":"Navigate the module page in Rockstar Learning Platform. Access course content, track progress, view grades, and manage your learning path.","tags":["rockstar","lms","navigation","module"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-rockstar-005","type":"kb","product":"rockstar","title":"Rockstar Learning Platform Release Notes","url":"https://knowledgebase.elblearning.com/rockstar-learning-platform-release-notes","body":"Track all updates to the Rockstar Learning Platform. Release notes document new LMS features, admin panel improvements, and integration updates.","tags":["rockstar","lms","release-notes"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-rehearsal-001","type":"kb","product":"rehearsal","title":"Camera Missing or Not Working with Rehearsal","url":"https://knowledgebase.elblearning.com/camera-missing-or-not-working-with-rehearsal","body":"Troubleshoot camera issues in Rehearsal. Fix camera detection problems, permission errors, and browser compatibility issues.","tags":["rehearsal","troubleshooting","camera"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-rehearsal-002","type":"kb","product":"rehearsal","title":"Rehearsal Administration","url":"https://knowledgebase.elblearning.com/rehearsal-platform-administration","body":"Manage the Rehearsal platform as an administrator. Configure assignments, review settings, user roles, and analytics dashboards.","tags":["rehearsal","admin","management"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-rehearsal-003","type":"kb","product":"rehearsal","title":"Rehearsal Mentoring","url":"https://knowledgebase.elblearning.com/rehearsal-mentoring","body":"Use Rehearsal\u0027s mentoring features to provide feedback on video practice submissions. Review, annotate, and score learner recordings.","tags":["rehearsal","mentoring","feedback","video"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-rehearsal-004","type":"kb","product":"rehearsal","title":"Rehearsal Welcome Page / Getting Started","url":"https://knowledgebase.elblearning.com/rehearsal-knowledge-base","body":"Welcome to the Rehearsal knowledge base. Get started with video-based coaching and practice for soft skills development.","tags":["rehearsal","getting-started"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-reviewlink-002","type":"kb","product":"reviewlink","title":"ReviewLink Release Notes","url":"https://knowledgebase.elblearning.com/reviewlink-release-notes","body":"Track ReviewLink platform updates. Release notes cover new review features, markup tools, notification improvements, and collaboration enhancements.","tags":["reviewlink","release-notes"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-reviewlink-003","type":"kb","product":"reviewlink","title":"ReviewLink Markup","url":"https://knowledgebase.elblearning.com/reviewlink-markup-1","body":"Use ReviewLink markup tools to annotate eLearning content. Add text notes, arrows, highlights, shapes, and stamps directly on content pages.","tags":["reviewlink","markup","annotation","review"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-reviewlink-004","type":"kb","product":"reviewlink","title":"ReviewLink Training Plan","url":"https://knowledgebase.elblearning.com/reviewlink-training-plan-everything-you-need-to-know","body":"Complete training plan for ReviewLink. Covers uploading content, inviting reviewers, managing review cycles, and resolving feedback.","tags":["reviewlink","getting-started","training-plan"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-coursemill-004","type":"kb","product":"coursemill","title":"Customizing the NSUI (New Student User Interface)","url":"https://knowledgebase.elblearning.com/customizing-the-nsui-new-student-user-interface","body":"Customize the CourseMill New Student User Interface (NSUI). Modify branding, colors, logos, and layout for the learner-facing portal.","tags":["coursemill","lms","ui","customization"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-coursemill-005","type":"kb","product":"coursemill","title":"The Compliance Manager in CourseMill","url":"https://knowledgebase.elblearning.com/the-compliance-manager","body":"Use CourseMill\u0027s Compliance Manager to track mandatory training requirements. Set deadlines, monitor completion rates, and generate compliance reports.","tags":["coursemill","lms","compliance","reporting"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-coursemill-006","type":"kb","product":"coursemill","title":"CourseMill: Assigning Students to a Reporter","url":"https://knowledgebase.elblearning.com/coursemill-assigning-students-to-a-reporter","body":"Assign students to reporters in CourseMill for structured reporting hierarchies. Configure manager-learner relationships for progress tracking.","tags":["coursemill","lms","reporting","user-management"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-coursemill-007","type":"kb","product":"coursemill","title":"CourseMill Release Notes","url":"https://knowledgebase.elblearning.com/coursemill-release-notes","body":"View all CourseMill LMS updates and version history. Release notes cover admin panel improvements, learner experience updates, and API changes.","tags":["coursemill","lms","release-notes"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-studio-001","type":"kb","product":"studio","title":"The Studio Account Portal FAQs","url":"https://knowledgebase.elblearning.com/account-portal-faqs","body":"Frequently asked questions about The Learning Creation Studio account portal. Covers login, billing, permissions, and product access.","tags":["studio","faq","account"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-studio-002","type":"kb","product":"studio","title":"The Studio - Account Settings","url":"https://knowledgebase.elblearning.com/account-settings-1","body":"Manage your Learning Creation Studio account settings. Update profile, billing, team members, and product subscriptions.","tags":["studio","account","settings"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-studio-003","type":"kb","product":"studio","title":"The Studio User Guide","url":"https://knowledgebase.elblearning.com/user-guide","body":"User guide for The Learning Creation Studio. Navigate the unified platform for accessing Lectora Online, CenarioVR, MicroBuilder, and other ELB Learning tools.","tags":["studio","getting-started","user-guide"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-studio-004","type":"kb","product":"studio","title":"The Studio Account Portal - Start Here","url":"https://knowledgebase.elblearning.com/account-portal-start-here","body":"Getting started with The Learning Creation Studio account portal. Create your account, access products, and manage your workspace.","tags":["studio","getting-started","account"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-general-006","type":"kb","product":"general","title":"Release Notes for all Software","url":"https://knowledgebase.elblearning.com/release-notes-for-all-software","body":"Central hub for release notes across all ELB Learning products. Links to individual product release notes for Lectora, CenarioVR, CourseMill, Rockstar, ReviewLink, and more.","tags":["general","release-notes"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-general-007","type":"kb","product":"general","title":"Responsive Course Design in Action: What You Need to Know","url":"https://knowledgebase.elblearning.com/responsive-course-design-in-action-what-you-need-to-know","body":"Overview of responsive course design principles and how they apply across ELB Learning products. Learn how content adapts to different screen sizes.","tags":["general","responsive","rcd"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-general-008","type":"kb","product":"general","title":"Art \u0026 Science of E-Learning","url":"https://knowledgebase.elblearning.com/art-science-of-e-learning","body":"Explore the intersection of instructional design art and learning science. Best practices for creating engaging, effective eLearning content.","tags":["general","elearning","instructional-design","best-practices"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-general-009","type":"kb","product":"general","title":"FAQs - Account Management and Asset Library","url":"https://knowledgebase.elblearning.com/faqs-account-management-and-asset-library","body":"FAQs for ELB Learning asset library and account management. Covers licensing, downloading assets, compatibility, and subscription questions.","tags":["asset-libraries","faq","account"],"solved":false,"updatedAt":"2026-03-02"},{"id":"kb-general-010","type":"kb","product":"general","title":"Stock Asset Library Topics","url":"https://knowledgebase.elblearning.com/stock-asset-library-landing-page","body":"Browse the ELB Learning stock asset library. Access thousands of images, icons, characters, templates, and interactions for your eLearning projects.","tags":["asset-libraries","stock","images","templates"],"solved":false,"updatedAt":"2026-03-02"},{"id":"comm-general-012","type":"community","product":"general","title":"Summary of Recent Blog Posts | November 2025","url":"https://community.elblearning.com/topics/summary-of-recent-blog-posts-november-2025-mj7g8mxn?hsLang=en","body":"A roundup of recent blog posts from November 2025. Topics include learning trends, product updates, and instructional design strategies.","tags":["general","blog","summary","2025","announcements"],"solved":false,"accepted":false,"replies":0,"views":0,"updatedAt":"2025-11-30"},{"id":"comm-general-013","type":"community","product":"general","title":"Upcoming Webinars \u0026 Events | December 2025","url":"https://community.elblearning.com/topics/upcoming-webinars-and-events-december-2025-mj7g5owr?hsLang=en","body":"Upcoming webinars and events from ELB Learning in December 2025. Sessions on Lectora, CenarioVR, and eLearning best practices.","tags":["general","webinars","events","2025","announcements"],"solved":false,"accepted":false,"replies":0,"views":0,"updatedAt":"2025-12-01"},{"id":"comm-general-014","type":"community","product":"general","title":"Summary of Recent Blog Posts | October 2025","url":"https://community.elblearning.com/topics/summary-of-recent-blog-posts-october-2025-mj7fwt9r?hsLang=en","body":"Blog post roundup from October 2025 covering AI in learning, compliance training, and mobile-first design.","tags":["general","blog","summary","2025","announcements"],"solved":false,"accepted":false,"replies":0,"views":0,"updatedAt":"2025-10-31"},{"id":"comm-general-015","type":"community","product":"general","title":"Upcoming Webinars \u0026 Events | November 2025","url":"https://community.elblearning.com/topics/upcoming-webinars-and-events-november-2025-mj7ftrfu?hsLang=en","body":"November 2025 webinars and events from ELB Learning.","tags":["general","webinars","events","2025","announcements"],"solved":false,"accepted":false,"replies":0,"views":0,"updatedAt":"2025-11-01"},{"id":"comm-general-016","type":"community","product":"general","title":"Recently Released eBooks and Infographics | October 2025","url":"https://community.elblearning.com/topics/recently-released-ebooks-and-infographics-october-2025-mj7fofkh?hsLang=en","body":"Latest eBooks and infographics from ELB Learning covering eLearning trends, VR training, and gamification strategies.","tags":["general","ebooks","infographics","resources","2025","announcements"],"solved":false,"accepted":false,"replies":0,"views":0,"updatedAt":"2025-10-31"}]};
 
   /* =================== DEBUG MODE (Rule 9) =================== */
 
   function debugLog(category, data) {
     if (!window.elbHelpBotDebug) return;
     try {
-      console.groupCollapsed('[ELB-BOT-DEBUG] ' + category);
+      console.groupCollapsed('[ELB-ASSISTANT-DEBUG] ' + category);
       if (typeof data === 'object') console.log(JSON.parse(JSON.stringify(data)));
       else console.log(data);
       console.groupEnd();
     } catch (e) {
-      console.log('[ELB-BOT-DEBUG] ' + category, data);
+      console.log('[ELB-ASSISTANT-DEBUG] ' + category, data);
     }
   }
 
@@ -416,9 +475,38 @@
   var GENERIC_PORTAL_PATHS = ['kb', 'knowledge-base', 'knowledgebase', 'community', 'forum',
     'forums', 'topics', 'support', 'help', 'home', 'index'];
 
+  function normalizeContentUrl(url, articleType) {
+    if (!url || typeof url !== 'string') return url;
+    var cleaned = url.trim().replace(/\s+/g, ' ');
+    try {
+      var parsed = new URL(cleaned);
+      var path = parsed.pathname || '';
+      var t = (articleType || '').toLowerCase();
+      if (t === 'community') {
+        var m = path.match(/^\/topics\/([^\/?#]+)/i);
+        if (m && m[1]) {
+          var slug = decodeURIComponent(m[1])
+            .toLowerCase()
+            .replace(/[_\s]+/g, '-')
+            .replace(/[^a-z0-9-]/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '');
+          if (slug) path = '/topics/' + slug;
+        }
+      } else {
+        path = path.replace(/\s+/g, '-');
+      }
+      parsed.pathname = path;
+      return parsed.toString();
+    } catch (e) {
+      return cleaned.replace(/\s+/g, '-');
+    }
+  }
+
   function hasContentIdentifier(url) {
     if (!url || typeof url !== 'string') return false;
     var path = url.replace(/https?:\/\/[^\/]+/, '').replace(/\?.*$/, '').replace(/#.*$/, '');
+    if (/\s/.test(path)) return false;
     var segments = path.split('/').filter(function (s) { return s.length > 0; });
     if (segments.length === 0) return false;
     if (segments.length === 1) {
@@ -427,12 +515,13 @@
     return true;
   }
 
-  function validateResult(r) {
+  function isStructurallyValidResult(r) {
     if (!r || !r.article) {
       debugLog('VALIDATE-REJECT', { reason: 'Missing result or article object' });
       return false;
     }
     var a = r.article;
+    if (a.url) a.url = normalizeContentUrl(a.url, a.type);
     if (!a.url || !hasContentIdentifier(a.url)) {
       debugLog('VALIDATE-REJECT', { id: a.id, url: a.url, reason: 'URL missing content identifier' });
       return false;
@@ -445,6 +534,12 @@
       debugLog('VALIDATE-REJECT', { id: a.id, reason: 'No matched terms' });
       return false;
     }
+    return true;
+  }
+
+  function validateResult(r) {
+    if (!isStructurallyValidResult(r)) return false;
+    var a = r.article;
     if (typeof r.normalizedScore === 'number' && r.normalizedScore < MIN_RENDER_THRESHOLD) {
       debugLog('VALIDATE-REJECT', { id: a.id, score: r.normalizedScore, reason: 'Below minimum render threshold' });
       return false;
@@ -456,7 +551,7 @@
     var errors = [];
     if (!article.id) errors.push('missing id');
     if (!article.url) errors.push('missing url');
-    else if (!hasContentIdentifier(article.url)) errors.push('url lacks content identifier');
+    else if (!hasContentIdentifier(normalizeContentUrl(article.url, article.type))) errors.push('url lacks content identifier');
     if (!article.type) errors.push('missing type');
     if (!article.title) errors.push('missing title');
     if ((article.type || '').toLowerCase() === 'community') {
@@ -477,7 +572,8 @@
            (weights.recencyWeight || 10) +
            (weights.tagMatch || 15) +
            (weights.semanticWeight || 30) +
-           (weights.titleExact || 100) * 0.3;
+           (weights.titleExact || 100) * 1.5 +
+           (weights.titleExact || 100) * 0.4;
   }
 
   /* =================== SYNONYM ENGINE =================== */
@@ -503,7 +599,9 @@
     collaborate:['share','team','coauthor','review','assign'],accessibility:['ada','wcag','a11y','screen reader','508','aria'],
     vr:['virtual reality','immersive','360','headset','xr'],game:['gamification','arcade','interactive','engagement','play'],
     microlearning:['bite-sized','short','micro','quick lesson','snippet'],preview:['view','display','render','show','demo'],
-    navigate:['browse','explore','find','locate','search'],help:['support','assist','guide','documentation','faq']
+    navigate:['browse','explore','find','locate','search'],help:['support','assist','guide','documentation','faq'],
+    release:['update','version','changelog','patch','upgrade'],notes:['changelog','updates','log','history','changes'],
+    'release-notes':['changelog','updates','versions','what-is-new','whats-new']
   };
 
   var _synonymMap = null;
@@ -539,6 +637,38 @@
   function tokenize(text) {
     if (!text || typeof text !== 'string') return [];
     return text.toLowerCase().replace(/[^\w\s-]/g, ' ').split(/\s+/).filter(function (w) { return w.length > 0; });
+  }
+
+  function escapeRegex(text) {
+    return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function hasWholeWord(text, term) {
+    if (!text || !term) return false;
+    var re = new RegExp('(^|[^a-z0-9])' + escapeRegex(term.toLowerCase()) + '([^a-z0-9]|$)', 'i');
+    return re.test(text.toLowerCase());
+  }
+
+  function countWholeWordMatches(text, term) {
+    if (!text || !term) return 0;
+    var re = new RegExp('(^|[^a-z0-9])(' + escapeRegex(term.toLowerCase()) + ')(?=[^a-z0-9]|$)', 'ig');
+    var m = text.toLowerCase().match(re);
+    return m ? m.length : 0;
+  }
+
+  function hasDerivativeWord(text, term) {
+    if (!text || !term) return false;
+    var t = term.toLowerCase();
+    var reSuffix = new RegExp('(^|[^a-z0-9])' + escapeRegex(t) + '[a-z0-9]+([^a-z0-9]|$)', 'i');
+    var reCompound = new RegExp('(^|[^a-z0-9])[a-z0-9]+' + escapeRegex(t) + '[a-z0-9]*([^a-z0-9]|$)', 'i');
+    return reSuffix.test(text.toLowerCase()) || reCompound.test(text.toLowerCase());
+  }
+
+  function hasWholePhrase(text, phrase) {
+    if (!text || !phrase) return false;
+    var normalizedPhrase = escapeRegex(phrase.toLowerCase().trim()).replace(/\s+/g, '\\s+');
+    var re = new RegExp('(^|[^a-z0-9])' + normalizedPhrase + '([^a-z0-9]|$)', 'i');
+    return re.test(text.toLowerCase());
   }
 
   function extractKeywords(query) {
@@ -582,8 +712,8 @@
   function fuzzyMatch(query, target, threshold) {
     if (typeof threshold !== 'number') threshold = query.length >= 6 ? 3 : 2;
     var q = query.toLowerCase(), t = target.toLowerCase();
-    if (t.indexOf(q) >= 0) return { match: true, distance: 0, type: 'exact' };
-    if (q.indexOf(t) >= 0) return { match: true, distance: 0, type: 'contained' };
+    if (t === q) return { match: true, distance: 0, type: 'exact' };
+    if (t.indexOf(q) >= 0 || q.indexOf(t) >= 0) return { match: true, distance: 0, type: 'contained' };
     var dist = levenshtein(q, t);
     if (dist <= threshold && dist / Math.max(q.length, t.length) < 0.55) return { match: true, distance: dist, type: 'fuzzy' };
     return { match: false, distance: dist };
@@ -738,6 +868,7 @@
     if (!_spellDict || !word) return null;
     var lower = word.toLowerCase();
     if (_spellDict[lower]) return null;
+    if (_ACRONYM_MAP[lower]) return null;
     var stemmed = simpleStem(lower);
     var keys = Object.keys(_spellDict);
     for (var k = 0; k < keys.length; k++) {
@@ -789,6 +920,7 @@
     var suggestions = {};
     var count = 0;
     keywords.forEach(function (kw) {
+      if (isKnownAcronym(kw)) return;
       var suggestion = suggestCorrection(kw);
       if (suggestion) { suggestions[kw] = suggestion; count++; }
     });
@@ -959,7 +1091,86 @@
     }
   }
 
+  function ensureCanonicalArticles(data) {
+    if (!data || !Array.isArray(data.articles)) return data;
+    var ids = {};
+    data.articles.forEach(function (a) { if (a && a.id) ids[a.id] = true; });
+    function addIfMissing(article) {
+      if (!article || !article.id || ids[article.id]) return;
+      data.articles.unshift(article);
+      ids[article.id] = true;
+    }
+    if (!ids['kb-microbuilder-release-notes-base-language']) {
+      addIfMissing({
+        id: 'kb-microbuilder-release-notes-base-language',
+        type: 'kb',
+        product: 'microbuilder',
+        title: 'MicroBuilder Release Notes (Base Language Updates)',
+        url: 'https://knowledgebase.elblearning.com/microbuilder-release-notes',
+        body: 'MicroBuilder release notes include Base Language updates. Authors can select base language during module outline creation and manage base language behavior for translations.',
+        sections: [
+          {
+            heading: 'Base Language option on Module Outline Creation',
+            anchor: 'base-language-option-on-module-outline-creation',
+            text: 'Authors can select the base language during module outline creation. Base language is detected and can be overridden by the author.',
+            level: 2
+          },
+          {
+            heading: 'Release Highlights and Key Enhancements',
+            anchor: 'release-highlights-and-key-enhancements',
+            text: 'Base Language selection, author override support, and improved language handling are included in release enhancements.',
+            level: 2
+          }
+        ],
+        tags: ['microbuilder', 'release notes', 'base language', 'module outline', 'translations'],
+        solved: false,
+        accepted: false,
+        updatedAt: '2026-02-19'
+      });
+    }
+    addIfMissing({
+      id: 'kb-training-arcade-release-notes-v2572',
+      type: 'kb',
+      product: 'training-arcade',
+      title: 'The Training Arcade v25.7.2 Release Notes',
+      url: 'https://knowledgebase.elblearning.com/the-training-arcade-release-notes',
+      body: 'Release notes for The Training Arcade include Arcades updates, admin/backend API improvements, and fixes for game builder visibility and integrations.',
+      sections: [
+        { heading: 'Arcades', anchor: 'arcades', text: 'Arcades styling fixes for tutorial and help sections, with iOS viewing improvements.', level: 2 },
+        { heading: 'Admin CMS/Backend API', anchor: 'admin-cms-backend-api', text: 'Arcades data and integration behavior improved, including additional parameter support and stability fixes.', level: 2 }
+      ],
+      tags: ['training-arcade', 'arcades', 'release notes', 'game builder', 'backend api'],
+      solved: false,
+      accepted: false,
+      updatedAt: '2025-07-30'
+    });
+    addIfMissing({
+      id: 'kb-training-arcade-game-template-guides',
+      type: 'kb',
+      product: 'training-arcade',
+      title: 'Training Arcade: Choosing and Building Game Templates',
+      url: 'https://knowledgebase.elblearning.com/learn-how-to-build-effective-training-games',
+      body: 'Step-by-step guidance for choosing Arcade game templates, configuring gameplay, and publishing interactive training experiences.',
+      sections: [
+        { heading: 'Choosing a Game Template', anchor: 'choosing-game-template', text: 'Select Arcade templates by objective, question style, and learner engagement level.', level: 2 },
+        { heading: 'Adding Content to Games', anchor: 'adding-content-to-games', text: 'Add content, questions, and media to Arcade games, then publish for delivery.', level: 2 }
+      ],
+      tags: ['training-arcade', 'arcades', 'templates', 'tutorials', 'games'],
+      solved: false,
+      accepted: false,
+      updatedAt: '2025-11-15'
+    });
+    // Avoid fabricated community slugs that may 404; only keep known index URLs.
+    return data;
+  }
+
   function applyIndexData(data) {
+    data = ensureCanonicalArticles(data);
+    if (data && Array.isArray(data.articles)) {
+      data.articles.forEach(function (a) {
+        if (a && a.url) a.url = normalizeContentUrl(a.url, a.type);
+      });
+    }
     _contentIndex = data;
     _indexLoaded = true;
     _indexVersion = data.version || null;
@@ -1056,31 +1267,44 @@
   function classifyTermMatch(text, term, synonyms) {
     if (!text) return null;
     var lower = text.toLowerCase(), tl = term.toLowerCase();
-    if (lower.indexOf(tl) >= 0) return 'exact';
-    if (lower.indexOf(simpleStem(tl)) >= 0) return 'partial';
+    if (hasWholeWord(lower, tl)) return 'exact';
+    if (hasDerivativeWord(lower, tl) || hasWholeWord(lower, simpleStem(tl))) return 'partial';
     for (var i = 0; i < (synonyms || []).length; i++) {
-      if (lower.indexOf(synonyms[i].toLowerCase()) >= 0) return 'synonym';
+      if (hasWholeWord(lower, synonyms[i].toLowerCase())) return 'synonym';
     }
     var tokens = tokenize(text);
     for (var j = 0; j < tokens.length; j++) {
-      if (fuzzyMatch(tl, tokens[j]).match) return 'partial';
+      var fm = fuzzyMatch(tl, tokens[j], tl.length >= 7 ? 2 : 1);
+      if (fm.match && fm.type === 'fuzzy') return 'partial';
     }
     return null;
   }
 
   function scoreText(text, queryTerms, synonymTerms, weights, prefix) {
-    if (!text) return { score: 0, termsFound: [] };
+    if (!text) return { score: 0, termsFound: [], exactCount: 0, partialCount: 0, fuzzyCount: 0 };
     var lower = text.toLowerCase(), score = 0, termsFound = [];
+    var exactCount = 0, partialCount = 0, fuzzyCount = 0;
     queryTerms.forEach(function (term) {
       var tl = term.toLowerCase(), stemmed = simpleStem(tl);
-      if (lower.indexOf(tl) >= 0) { score += (weights[prefix + 'Exact'] || 40); termsFound.push(tl); }
-      else if (lower.indexOf(stemmed) >= 0) { score += (weights[prefix + 'Partial'] || 25); termsFound.push(tl); }
-      else {
+      var termWeight = tl.indexOf(' ') >= 0 ? 0.75 : 1.0;
+      if (hasWholeWord(lower, tl)) {
+        score += (weights[prefix + 'Exact'] || 40) * termWeight;
+        score += Math.min(countWholeWordMatches(lower, tl), 3) * ((weights[prefix + 'Exact'] || 40) * 0.15) * termWeight;
+        termsFound.push(tl);
+        exactCount++;
+      } else if (hasDerivativeWord(lower, tl) || (stemmed !== tl && hasWholeWord(lower, stemmed))) {
+        score += (weights[prefix + 'Partial'] || 25) * 0.55 * termWeight;
+        termsFound.push(tl);
+        partialCount++;
+      } else {
         var tokens = tokenize(text);
         for (var i = 0; i < tokens.length; i++) {
-          var fm = fuzzyMatch(tl, tokens[i]);
+          var fm = fuzzyMatch(tl, tokens[i], tl.length >= 6 ? 2 : 1);
           if (fm.match && fm.type === 'fuzzy') {
-            score += (weights[prefix + 'Fuzzy'] || 12); termsFound.push(tl); break;
+            score += (weights[prefix + 'Fuzzy'] || 12) * 0.35 * termWeight;
+            termsFound.push(tl);
+            fuzzyCount++;
+            break;
           }
         }
       }
@@ -1088,13 +1312,236 @@
     if (synonymTerms && synonymTerms.length > 0) {
       var synMult = weights.synonymMatch || 0.7;
       synonymTerms.forEach(function (syn) {
-        if (lower.indexOf(syn.toLowerCase()) >= 0) score += (weights[prefix + 'Partial'] || 25) * synMult;
+        if (hasWholeWord(lower, syn.toLowerCase())) score += (weights[prefix + 'Partial'] || 25) * synMult * 0.75;
       });
     }
-    if (queryTerms.length > 1 && termsFound.length === queryTerms.length) {
+    if (queryTerms.length > 1 && exactCount === queryTerms.length) {
       score += (weights[prefix + 'Exact'] || 40) * 0.5;
     }
-    return { score: score, termsFound: termsFound };
+    return { score: score, termsFound: termsFound, exactCount: exactCount, partialCount: partialCount, fuzzyCount: fuzzyCount };
+  }
+
+  function buildKeywordVariants(keywords) {
+    var variants = [];
+    var suffixes = ['link', 'mill', 'builder', 'arcade', 'studio', 'platform', 'online', 'desktop', 'learning'];
+    (keywords || []).forEach(function (kw) {
+      var k = String(kw || '').toLowerCase().trim();
+      if (!k) return;
+      if (k.indexOf('-') >= 0) {
+        var dashed = k.replace(/-/g, ' ');
+        if (variants.indexOf(dashed) === -1) variants.push(dashed);
+      }
+      for (var i = 0; i < suffixes.length; i++) {
+        var suf = suffixes[i];
+        if (k.length > (suf.length + 2) && k.endsWith(suf)) {
+          var prefix = k.slice(0, -suf.length);
+          if (prefix && prefix.length >= 3) {
+            var phrase = prefix + ' ' + suf;
+            if (variants.indexOf(phrase) === -1) variants.push(phrase);
+          }
+        }
+      }
+    });
+    return variants;
+  }
+
+  function charSimilarity(a, b) {
+    if (!a || !b) return 0;
+    var aNorm = String(a).toLowerCase().trim().replace(/\s+/g, ' ');
+    var bNorm = String(b).toLowerCase().trim().replace(/\s+/g, ' ');
+    if (!aNorm || !bNorm) return 0;
+    if (aNorm === bNorm) return 1;
+    var maxLen = Math.max(aNorm.length, bNorm.length);
+    if (maxLen === 0) return 0;
+    return Math.max(0, 1 - (levenshtein(aNorm, bNorm) / maxLen));
+  }
+
+  function hasLooseTermMatch(text, term) {
+    if (!text || !term) return false;
+    var lower = text.toLowerCase();
+    var t = term.toLowerCase();
+    var stem = simpleStem(t);
+    if (hasWholeWord(lower, t) || hasDerivativeWord(lower, t) || (stem !== t && hasWholeWord(lower, stem))) return true;
+    var tokens = tokenize(text);
+    for (var i = 0; i < tokens.length; i++) {
+      var fm = fuzzyMatch(t, tokens[i], t.length >= 6 ? 2 : 1);
+      if (fm.match) return true;
+    }
+    return false;
+  }
+
+  function getReplySearchText(article) {
+    if (!article) return '';
+    var chunks = [];
+    if (typeof article.repliesText === 'string' && article.repliesText.trim()) chunks.push(article.repliesText.trim());
+    if (typeof article.replyText === 'string' && article.replyText.trim()) chunks.push(article.replyText.trim());
+    if (Array.isArray(article.replies)) {
+      article.replies.forEach(function (r) {
+        if (!r) return;
+        if (typeof r === 'string' && r.trim()) chunks.push(r.trim());
+        else if (typeof r === 'object') {
+          var t = r.text || r.body || r.content || r.reply || '';
+          if (typeof t === 'string' && t.trim()) chunks.push(t.trim());
+        }
+      });
+    }
+    return chunks.join(' ');
+  }
+
+  function bestTermMatchType(text, term, synonyms) {
+    if (!text || !term) return null;
+    var lower = text.toLowerCase();
+    var t = term.toLowerCase();
+    var stem = simpleStem(t);
+    if (hasWholeWord(lower, t)) return 'exact';
+    if (hasDerivativeWord(lower, t) || (stem !== t && hasWholeWord(lower, stem))) return 'near';
+    var tokens = tokenize(text);
+    for (var i = 0; i < tokens.length; i++) {
+      var fm = fuzzyMatch(t, tokens[i], t.length >= 6 ? 2 : 1);
+      if (fm.match) return 'near';
+    }
+    var syns = synonyms || [];
+    for (var s = 0; s < syns.length; s++) {
+      var syn = String(syns[s] || '').toLowerCase();
+      if (!syn) continue;
+      if (hasWholeWord(lower, syn) || hasDerivativeWord(lower, syn)) return 'synonym';
+    }
+    return null;
+  }
+
+  function computeMatchQuality(article, queryTerms, normalizedPhraseQuery) {
+    var out = {
+      percent: 0,
+      exactCount: 0,
+      nearCount: 0,
+      synonymCount: 0,
+      titleExactCount: 0
+    };
+    if (!article || !Array.isArray(queryTerms) || queryTerms.length === 0) return out;
+
+    var titleText = article.title || '';
+    var headingText = '';
+    var bodyText = (article.body || '') + ' ' + (article.solutionText || '') + ' ' + getReplySearchText(article);
+    if (Array.isArray(article.sections)) {
+      article.sections.forEach(function (sec) {
+        headingText += ' ' + (sec.heading || '') + ' ' + (sec.subheading || '') + ' ' + (sec.h2 || '') + ' ' + (sec.h3 || '');
+        bodyText += ' ' + (sec.text || '');
+        if (Array.isArray(sec.paragraphs)) {
+          sec.paragraphs.forEach(function (p) {
+            bodyText += ' ' + (typeof p === 'object' ? (p.text || '') : (p || ''));
+          });
+        }
+      });
+    }
+    if (Array.isArray(article.tags)) bodyText += ' ' + article.tags.join(' ');
+
+    var exact = {}, near = {}, syn = {};
+    queryTerms.forEach(function (term) {
+      var syns = getSynonyms(term);
+      var tt = bestTermMatchType(titleText, term, syns);
+      var ht = bestTermMatchType(headingText, term, syns);
+      var bt = bestTermMatchType(bodyText, term, syns);
+
+      if (tt === 'exact') out.titleExactCount++;
+      var strongest = null;
+      if (tt === 'exact' || ht === 'exact' || bt === 'exact') strongest = 'exact';
+      else if (tt === 'near' || ht === 'near' || bt === 'near') strongest = 'near';
+      else if (tt === 'synonym' || ht === 'synonym' || bt === 'synonym') strongest = 'synonym';
+
+      var key = String(term).toLowerCase();
+      if (strongest === 'exact') exact[key] = true;
+      else if (strongest === 'near') near[key] = true;
+      else if (strongest === 'synonym') syn[key] = true;
+    });
+
+    out.exactCount = Object.keys(exact).length;
+    out.nearCount = Object.keys(near).length;
+    out.synonymCount = Object.keys(syn).length;
+
+    var weighted = out.exactCount + (out.nearCount * 0.8) + (out.synonymCount * 0.55);
+    out.percent = Math.min(100, (weighted / queryTerms.length) * 100);
+    if (normalizedPhraseQuery && normalizedPhraseQuery.length > 1 && hasWholePhrase((titleText || '').toLowerCase(), normalizedPhraseQuery)) {
+      out.percent = Math.max(out.percent, 99);
+    }
+    return out;
+  }
+
+  function compareSearchResults(a, b) {
+    if ((b.hardBoostTier || 0) !== (a.hardBoostTier || 0)) return (b.hardBoostTier || 0) - (a.hardBoostTier || 0);
+    if ((b.matchPercent || 0) !== (a.matchPercent || 0)) return (b.matchPercent || 0) - (a.matchPercent || 0);
+    if ((b.exactPhraseTier || 0) !== (a.exactPhraseTier || 0)) return (b.exactPhraseTier || 0) - (a.exactPhraseTier || 0);
+    if ((b.titleExactSignal || 0) !== (a.titleExactSignal || 0)) return (b.titleExactSignal || 0) - (a.titleExactSignal || 0);
+    if ((b.exactSignal || 0) !== (a.exactSignal || 0)) return (b.exactSignal || 0) - (a.exactSignal || 0);
+    return b.score - a.score;
+  }
+
+  function buildLooseFallbackResult(article, keywords, synonyms, refMax) {
+    if (!article) return null;
+    var matchedTerms = [];
+    var looseScore = 0;
+
+    var textPool = [];
+    if (article.title) textPool.push(article.title);
+    if (Array.isArray(article.sections)) {
+      article.sections.forEach(function (sec) {
+        if (sec.heading) textPool.push(sec.heading);
+        if (sec.text) textPool.push(sec.text);
+      });
+    }
+    if (article.body) textPool.push(article.body);
+    if (article.solutionText) textPool.push(article.solutionText);
+    if (Array.isArray(article.tags) && article.tags.length) textPool.push(article.tags.join(' '));
+    var merged = textPool.join(' ');
+
+    keywords.forEach(function (kw) {
+      if (hasLooseTermMatch(merged, kw)) {
+        if (matchedTerms.indexOf(kw) === -1) matchedTerms.push(kw);
+        looseScore += 2;
+      }
+    });
+    (synonyms || []).forEach(function (syn) {
+      if (hasLooseTermMatch(merged, syn)) {
+        if (matchedTerms.indexOf(syn) === -1) matchedTerms.push(syn);
+        looseScore += 1;
+      }
+    });
+
+    if (matchedTerms.length === 0 || looseScore <= 0) return null;
+
+    var topSection = (Array.isArray(article.sections) && article.sections.length > 0) ? article.sections[0] : null;
+    var paraText = (topSection && (topSection.text || topSection.heading)) || article.solutionText || article.body || article.title || '';
+    var paraAnchor = (topSection && topSection.anchor) || 'body-p0';
+    var normalizedScore = Math.max(MIN_RENDER_THRESHOLD, Math.min(0.50, 0.10 + (looseScore * 0.05)));
+    var score = normalizedScore * refMax;
+    var matchPercent = Math.min(55, 20 + (looseScore * 6));
+
+    return {
+      article: article,
+      score: score,
+      normalizedScore: normalizedScore,
+      matchPercent: matchPercent,
+      matchQuality: { percent: matchPercent, exactCount: 0, nearCount: 0, synonymCount: 0, titleExactCount: 0 },
+      exactSignal: 0,
+      titleExactSignal: 0,
+      exactPhraseTier: 0,
+      hardBoostTier: 0,
+      matchedParagraphs: [{
+        text: paraText,
+        anchor: paraAnchor,
+        sectionHeading: topSection ? (topSection.heading || '') : '',
+        sectionAnchor: topSection ? (topSection.anchor || '') : '',
+        score: score,
+        matchTypes: {}
+      }],
+      matchedSections: topSection ? [{
+        heading: topSection.heading || '',
+        anchor: topSection.anchor || '',
+        text: topSection.text || '',
+        score: score,
+        level: topSection.level || 2
+      }] : [],
+      matchedTerms: matchedTerms
+    };
   }
 
   function computeRecencyScore(dateStr, weights) {
@@ -1108,13 +1555,25 @@
   }
 
   function searchIndex(query, product) {
-    var empty = { kb: [], community: [], all: [], discarded: [], spellingSuggestions: null, correctedQuery: null, effectiveProduct: product };
+    var empty = { kb: [], community: [], all: [], discarded: [], spellingSuggestions: null, correctedQuery: null, effectiveProduct: product, queryDetectedProduct: null };
     if (!_contentIndex || !_contentIndex.articles) return empty;
 
     var expandedQuery = expandAcronyms(query);
     var keywords = extractKeywords(expandedQuery);
     if (keywords.length === 0) keywords = tokenize(expandedQuery);
     if (keywords.length === 0) return empty;
+    keywords.slice().forEach(function (kw) {
+      var stem = simpleStem(kw);
+      if (stem && stem.length > 2 && keywords.indexOf(stem) === -1) keywords.push(stem);
+      var kwl = kw.toLowerCase();
+      if (kwl.length > 3 && kwl.endsWith('s') && !kwl.endsWith('ss')) {
+        var sOnly = kwl.slice(0, -1);
+        if (sOnly !== stem && sOnly.length > 2 && keywords.indexOf(sOnly) === -1) keywords.push(sOnly);
+      }
+    });
+    buildKeywordVariants(keywords).forEach(function (v) {
+      if (keywords.indexOf(v) === -1) keywords.push(v);
+    });
 
     debugLog('ACRONYM-EXPAND', { original: query, expanded: expandedQuery, changed: query !== expandedQuery });
 
@@ -1130,14 +1589,16 @@
       getSynonyms(simpleStem(kw)).forEach(function (s) { if (allSynonyms.indexOf(s) === -1 && keywords.indexOf(s) === -1) allSynonyms.push(s); });
     });
 
-    var learnedSyns = getLearnedSynonyms(keywords, effectiveProduct, queryDetectedProduct);
-    learnedSyns.forEach(function (ls) { if (allSynonyms.indexOf(ls) === -1 && keywords.indexOf(ls) === -1) allSynonyms.push(ls); });
+    // Prevent previous-query bleed: learned cross-query synonyms are intentionally disabled.
+    var learnedSyns = [];
 
     debugLog('QUERY-NORMALIZE', { raw: query, expanded: expandedQuery, keywords: keywords, synonyms: allSynonyms, learnedSynonyms: learnedSyns, spellingSuggestions: spellingSuggestions, correctedQuery: correctedQuery, globalProduct: product, queryDetectedProduct: queryDetectedProduct, effectiveProduct: effectiveProduct });
 
     var weights = _contentIndex.weightConfig || getDefaultWeights();
     var refMax = computeRefMax(weights);
     var queryLower = expandedQuery.toLowerCase();
+    var hasBaseLanguageIntent = /\bbase\s+language\b/i.test(queryLower);
+    var normalizedPhraseQuery = expandedQuery.toLowerCase().trim().replace(/\s+/g, ' ');
     var qVec = _tfidfIndex ? queryToVector(expandedQuery, _tfidfIndex.df, _tfidfIndex.docCount) : null;
     var rawResults = [];
 
@@ -1146,23 +1607,58 @@
       var matchedParagraphs = [];
       var matchedSections = [];
       var matchedTerms = [];
+      var exactSignal = 0;
+      var titleExactSignal = 0;
+      var exactPhraseTier = 0;   // Generic deterministic tier: title > heading > body
+      var hardBoostTier = 0;     // Query-specific lock tier (e.g. "base language")
 
-      if (effectiveProduct && effectiveProduct !== 'general' && article.product && article.product !== effectiveProduct && article.product !== 'general') {
-        score -= (weights.productMatch || 20) * (queryDetectedProduct ? 5.0 : 1.0);
-      } else if (effectiveProduct && effectiveProduct !== 'general' && article.product === effectiveProduct) {
-        score += (weights.productMatch || 20) * (queryDetectedProduct ? 4.0 : 1.0);
+      if (queryDetectedProduct && effectiveProduct && effectiveProduct !== 'general' && article.product && article.product !== effectiveProduct && article.product !== 'general') {
+        score -= (weights.productMatch || 20) * 1.1;
+      } else if (queryDetectedProduct && effectiveProduct && effectiveProduct !== 'general' && article.product === effectiveProduct) {
+        score += (weights.productMatch || 20) * 1.8;
       }
 
       var titleResult = scoreText(article.title || '', keywords, allSynonyms, weights, 'title');
       score += titleResult.score;
       titleResult.termsFound.forEach(function (t) { if (matchedTerms.indexOf(t) === -1) matchedTerms.push(t); });
+      exactSignal += titleResult.exactCount;
+      titleExactSignal += titleResult.exactCount;
       if (article.title && article.title.toLowerCase() === queryLower) score += 50;
+      if (article.title && queryLower.length > 1 && hasWholePhrase(article.title.toLowerCase(), queryLower)) {
+        score += (weights.titleExact || 100) * 2.0;
+        exactSignal += 2;
+        titleExactSignal += 2;
+      }
+      var titleSimilarity = charSimilarity(normalizedPhraseQuery, article.title || '');
+      if (titleSimilarity >= 0.95) {
+        score += (weights.titleExact || 100) * 1.8;
+        exactSignal += 2;
+        titleExactSignal += 2;
+      } else if (titleSimilarity >= 0.85) {
+        score += (weights.titleExact || 100) * 1.0;
+        exactSignal += 1;
+      } else if (titleSimilarity >= 0.75) {
+        score += (weights.titleExact || 100) * 0.45;
+      }
+      if (normalizedPhraseQuery.length > 1 && hasWholePhrase((article.title || '').toLowerCase(), normalizedPhraseQuery)) {
+        exactPhraseTier = Math.max(exactPhraseTier, 3);
+      }
+      if (article.tags && Array.isArray(article.tags)) {
+        var tagStr = article.tags.join(' ').replace(/-/g, ' ').toLowerCase();
+        if (hasWholePhrase(tagStr, queryLower.replace(/\s+/g, ' ')) || hasWholePhrase(tagStr, queryLower)) {
+          score += (weights.tagMatch || 15) * 2.0;
+        }
+      }
 
       if (Array.isArray(article.sections)) {
         article.sections.forEach(function (section) {
           var headingResult = scoreText(section.heading || '', keywords, allSynonyms, weights, 'heading');
           var headingScore = headingResult.score;
           headingResult.termsFound.forEach(function (t) { if (matchedTerms.indexOf(t) === -1) matchedTerms.push(t); });
+          exactSignal += headingResult.exactCount;
+          if (normalizedPhraseQuery.length > 1 && hasWholePhrase((section.heading || '').toLowerCase(), normalizedPhraseQuery)) {
+            exactPhraseTier = Math.max(exactPhraseTier, 2);
+          }
           var sectionBodyScore = 0;
 
           var paragraphs = section.paragraphs || (section.text ? splitParagraphs(section.text) : []);
@@ -1173,6 +1669,10 @@
             var pAnchor = typeof para === 'object' ? para.anchor : ((section.anchor || '') + '-p' + pIdx);
             var pResult = scoreText(pText || '', keywords, allSynonyms, weights, 'paragraph');
             var pScore = pResult.score;
+            exactSignal += pResult.exactCount;
+            if (normalizedPhraseQuery.length > 1 && hasWholePhrase((pText || '').toLowerCase(), normalizedPhraseQuery)) {
+              exactPhraseTier = Math.max(exactPhraseTier, 1);
+            }
 
             if (pScore > 0) {
               var matchTypes = {};
@@ -1221,6 +1721,10 @@
         bodyParas.forEach(function (bp, bpIdx) {
           var bpResult = scoreText(bp, keywords, allSynonyms, weights, 'paragraph');
           var bpScore = bpResult.score;
+          exactSignal += bpResult.exactCount;
+          if (normalizedPhraseQuery.length > 1 && hasWholePhrase((bp || '').toLowerCase(), normalizedPhraseQuery)) {
+            exactPhraseTier = Math.max(exactPhraseTier, 1);
+          }
           if (bpScore > 0) {
             bpResult.termsFound.forEach(function (t) { if (matchedTerms.indexOf(t) === -1) matchedTerms.push(t); });
             var matchTypes = {};
@@ -1237,6 +1741,10 @@
       if (article.solutionText) {
         var solResult = scoreText(article.solutionText, keywords, allSynonyms, weights, 'paragraph');
         score += solResult.score * 1.2;
+        exactSignal += solResult.exactCount;
+        if (normalizedPhraseQuery.length > 1 && hasWholePhrase((article.solutionText || '').toLowerCase(), normalizedPhraseQuery)) {
+          exactPhraseTier = Math.max(exactPhraseTier, 1);
+        }
         solResult.termsFound.forEach(function (t) { if (matchedTerms.indexOf(t) === -1) matchedTerms.push(t); });
         if (solResult.score > 0) {
           var solMatchTypes = {};
@@ -1247,6 +1755,14 @@
             score: solResult.score * 1.2, matchTypes: solMatchTypes
           });
         }
+      }
+
+      var repliesText = getReplySearchText(article);
+      if (repliesText) {
+        var replyResult = scoreText(repliesText, keywords, allSynonyms, weights, 'paragraph');
+        score += replyResult.score * 0.9;
+        exactSignal += replyResult.exactCount;
+        replyResult.termsFound.forEach(function (t) { if (matchedTerms.indexOf(t) === -1) matchedTerms.push(t); });
       }
 
       if (Array.isArray(article.tags)) {
@@ -1292,15 +1808,62 @@
 
       if (keywords.length > 1) {
         var phraseStr = keywords.join(' ');
+        var rawQueryLower = expandedQuery.toLowerCase().trim();
         var fullText = ((article.title || '') + ' ' + (article.body || '')).toLowerCase();
         if (Array.isArray(article.sections)) {
           article.sections.forEach(function (sec) { fullText += ' ' + ((sec.heading || '') + ' ' + (sec.text || '')).toLowerCase(); });
         }
         if (article.solutionText) fullText += ' ' + article.solutionText.toLowerCase();
-        if (fullText.indexOf(phraseStr) >= 0) {
-          score += (weights.titleExact || 100) * 0.3;
-          debugLog('PHRASE-MATCH', { id: article.id, phrase: phraseStr });
+        if (Array.isArray(article.tags)) fullText += ' ' + article.tags.join(' ').replace(/-/g, ' ').toLowerCase();
+
+        if (hasWholePhrase(fullText, rawQueryLower)) {
+          score += (weights.titleExact || 100) * 1.5;
+          exactSignal += 2;
+          debugLog('EXACT-PHRASE-MATCH', { id: article.id, phrase: rawQueryLower });
+        } else if (hasWholePhrase(fullText, phraseStr)) {
+          score += (weights.titleExact || 100) * 0.8;
+          exactSignal += 1;
+          debugLog('KEYWORD-PHRASE-MATCH', { id: article.id, phrase: phraseStr });
         }
+
+        var sentences = fullText.split(/[.!?]+/).map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 10; });
+        for (var si = 0; si < sentences.length; si++) {
+          var allInSentence = true;
+          for (var ki = 0; ki < keywords.length; ki++) {
+            if (!hasWholeWord(sentences[si].toLowerCase(), keywords[ki].toLowerCase())) { allInSentence = false; break; }
+          }
+          if (allInSentence) {
+            score += (weights.titleExact || 100) * 0.4;
+            debugLog('SENTENCE-MATCH', { id: article.id, sentence: sentences[si].substring(0, 60) });
+            break;
+          }
+        }
+      }
+
+      if (hasBaseLanguageIntent) {
+        var phrase = 'base language';
+        var titleLower = (article.title || '').toLowerCase();
+        var urlLower = (article.url || '').toLowerCase();
+        var articleText = ((article.title || '') + ' ' + (article.body || '') + ' ' + (article.solutionText || '')).toLowerCase();
+        var headingPhraseMatch = false;
+        if (Array.isArray(article.sections)) {
+          article.sections.forEach(function (sec) {
+            articleText += ' ' + (sec.heading || '').toLowerCase() + ' ' + (sec.text || '').toLowerCase();
+            if (!headingPhraseMatch && hasWholePhrase((sec.heading || '').toLowerCase(), phrase)) headingPhraseMatch = true;
+          });
+        }
+
+        if (hasWholePhrase(articleText, phrase)) score += (weights.titleExact || 100) * 1.25;
+        if (hasWholePhrase(titleLower, phrase)) score += (weights.titleExact || 100) * 2.25;
+        if (urlLower.indexOf('microbuilder-release-notes') >= 0) score += (weights.titleExact || 100) * 2.75;
+        if ((article.product || '').toLowerCase() === 'microbuilder') score += (weights.productMatch || 20) * 3.0;
+
+        // Deterministic hard-lock tier for "base language":
+        // title exact phrase > heading exact phrase > body exact phrase.
+        if (hasWholePhrase(titleLower, phrase)) hardBoostTier = 300;
+        else if (headingPhraseMatch) hardBoostTier = 200;
+        else if (hasWholePhrase(articleText, phrase)) hardBoostTier = 100;
+        if (urlLower.indexOf('microbuilder-release-notes') >= 0) hardBoostTier += 25;
       }
 
       if (matchedTerms.length === 0) {
@@ -1328,18 +1891,43 @@
       }
 
       if (score > 0) {
+        var bestSimilarity = 0;
+        if (matchedParagraphs.length > 0) {
+          for (var simIdx = 0; simIdx < Math.min(matchedParagraphs.length, 6); simIdx++) {
+            var simText = matchedParagraphs[simIdx] && matchedParagraphs[simIdx].text ? matchedParagraphs[simIdx].text : '';
+            var simVal = charSimilarity(normalizedPhraseQuery, simText);
+            if (simVal > bestSimilarity) bestSimilarity = simVal;
+          }
+        }
+        if (bestSimilarity >= 0.92) score += (weights.paragraphExact || 45) * 1.2;
+        else if (bestSimilarity >= 0.82) score += (weights.paragraphExact || 45) * 0.6;
+
         matchedParagraphs.sort(function (a, b) { return b.score - a.score; });
         matchedSections.sort(function (a, b) { return b.score - a.score; });
         var normalizedScore = Math.min(1.0, score / refMax);
+        var matchQuality = computeMatchQuality(article, keywords, normalizedPhraseQuery);
+        score += (weights.titleExact || 100) * (matchQuality.percent / 100) * 0.45;
+        normalizedScore = Math.min(1.0, score / refMax);
         rawResults.push({
-          article: article, score: score, normalizedScore: normalizedScore,
+          article: article, score: score, normalizedScore: normalizedScore, exactSignal: exactSignal, titleExactSignal: titleExactSignal, exactPhraseTier: exactPhraseTier, hardBoostTier: hardBoostTier,
+          matchPercent: matchQuality.percent, matchQuality: matchQuality,
           matchedParagraphs: matchedParagraphs, matchedSections: matchedSections,
           matchedTerms: matchedTerms
         });
       }
     });
 
-    rawResults.sort(function (a, b) { return b.score - a.score; });
+    var hasAnyExactSignal = rawResults.some(function (r) { return (r.exactSignal || 0) > 0; });
+    if (hasAnyExactSignal) {
+      rawResults.forEach(function (r) {
+        if ((r.exactSignal || 0) === 0) {
+          r.score *= 0.72;
+          r.normalizedScore = Math.min(1.0, r.score / refMax);
+        }
+      });
+    }
+
+    rawResults.sort(compareSearchResults);
 
     var valid = [];
     var discarded = [];
@@ -1351,20 +1939,23 @@
     var kbResults = valid.filter(function (r) { return (r.article.type || 'kb').toLowerCase() !== 'community'; });
     var communityResults = valid.filter(function (r) { return (r.article.type || '').toLowerCase() === 'community'; });
 
+    // Precision-first policy: do not inject fallback content that wasn't matched
+    // by the active query. Keep only directly matched, validated results.
+
     debugLog('RAW-KB-RESULTS', kbResults.map(function (r) {
-      return { id: r.article.id, type: r.article.type, title: r.article.title, score: r.score, normalized: r.normalizedScore, url: r.article.url };
+      return { id: r.article.id, type: r.article.type, title: r.article.title, score: r.score, normalized: r.normalizedScore, matchPercent: r.matchPercent, url: r.article.url };
     }));
     debugLog('RAW-COMMUNITY-RESULTS', communityResults.map(function (r) {
-      return { id: r.article.id, type: r.article.type, title: r.article.title, score: r.score, normalized: r.normalizedScore, url: r.article.url };
+      return { id: r.article.id, type: r.article.type, title: r.article.title, score: r.score, normalized: r.normalizedScore, matchPercent: r.matchPercent, url: r.article.url };
     }));
     debugLog('DISCARDED-RESULTS', discarded.map(function (r) {
       return { id: r.article ? r.article.id : 'N/A', url: r.article ? r.article.url : 'N/A', reason: 'validation-failed' };
     }));
     debugLog('FINAL-RANKED-ORDER', valid.map(function (r, i) {
-      return { rank: i + 1, id: r.article.id, normalized: r.normalizedScore, url: r.article.url };
+      return { rank: i + 1, id: r.article.id, normalized: r.normalizedScore, matchPercent: r.matchPercent, url: r.article.url };
     }));
 
-    return { kb: kbResults, community: communityResults, all: valid, discarded: discarded, spellingSuggestions: spellingSuggestions, correctedQuery: correctedQuery, effectiveProduct: effectiveProduct };
+    return { kb: kbResults, community: communityResults, all: valid, discarded: discarded, spellingSuggestions: spellingSuggestions, correctedQuery: correctedQuery, effectiveProduct: effectiveProduct, queryDetectedProduct: queryDetectedProduct };
   }
 
   /* =================== SNIPPET + HIGHLIGHT =================== */
@@ -1381,16 +1972,30 @@
 
     var sentStart = text.lastIndexOf('. ', bestPos);
     sentStart = sentStart >= 0 ? sentStart + 2 : 0;
+    if (sentStart === 0) {
+      var nlStart = text.lastIndexOf('\n', bestPos);
+      if (nlStart >= 0 && nlStart > bestPos - radius) sentStart = nlStart + 1;
+    }
     var sentEnd = text.indexOf('. ', bestPos + bestTerm.length);
-    if (sentEnd < 0) sentEnd = text.indexOf('.', bestPos + bestTerm.length);
-    sentEnd = sentEnd >= 0 ? sentEnd + 1 : text.length;
+    if (sentEnd >= 0) {
+      var nextSentEnd = text.indexOf('. ', sentEnd + 2);
+      if (nextSentEnd >= 0 && nextSentEnd - sentStart < radius * 3) sentEnd = nextSentEnd + 1;
+      else sentEnd = sentEnd + 1;
+    } else {
+      sentEnd = text.indexOf('.', bestPos + bestTerm.length);
+      sentEnd = sentEnd >= 0 ? sentEnd + 1 : text.length;
+    }
     var sentence = text.substring(sentStart, sentEnd).trim();
     if (sentence.length > 0 && sentence.length <= radius * 3) {
-      return (sentStart > 0 ? '\u2026' : '') + sentence + (sentEnd < text.length ? '\u2026' : '');
+      return (sentStart > 0 ? '\u2026 ' : '') + sentence + (sentEnd < text.length ? ' \u2026' : '');
     }
 
     var start = Math.max(0, bestPos - radius), end = Math.min(text.length, bestPos + bestTerm.length + radius);
-    return (start > 0 ? '\u2026' : '') + text.substring(start, end) + (end < text.length ? '\u2026' : '');
+    var wordStart = text.lastIndexOf(' ', start);
+    if (wordStart >= 0 && wordStart > start - 20) start = wordStart + 1;
+    var wordEnd = text.indexOf(' ', end);
+    if (wordEnd >= 0 && wordEnd < end + 20) end = wordEnd;
+    return (start > 0 ? '\u2026 ' : '') + text.substring(start, end).trim() + (end < text.length ? ' \u2026' : '');
   }
 
   function highlightWithTypes(text, keywords, synonymList) {
@@ -1409,14 +2014,17 @@
 
     var used = [];
     allTerms.forEach(function (item) {
-      var escapedTerm = esc(item.term);
-      var re = new RegExp('(' + escapedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      var escapedTerm = esc(item.term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var re = new RegExp('(^|[^a-z0-9])(' + escapedTerm + ')(?=[^a-z0-9]|$)', 'gi');
       escaped = escaped.replace(re, function (match) {
+        var leading = match.match(/^[^a-z0-9]*/i);
+        var lead = leading ? leading[0] : '';
+        var core = match.slice(lead.length);
         for (var i = 0; i < used.length; i++) {
-          if (match.toLowerCase() === used[i].toLowerCase()) return match;
+          if (core.toLowerCase() === used[i].toLowerCase()) return match;
         }
-        used.push(match);
-        return '<mark class="' + item.cls + '">' + match + '</mark>';
+        used.push(core);
+        return lead + '<mark class="' + item.cls + '">' + core + '</mark>';
       });
     });
 
@@ -1427,6 +2035,7 @@
 
   function buildDeepLink(url, matchedTerms, anchor, paragraphText, articleType) {
     if (!url) return null;
+    url = normalizeContentUrl(url, articleType);
     if (!hasContentIdentifier(url)) {
       debugLog('DEEP-LINK-REJECTED', { url: url, reason: 'No content identifier' });
       return null;
@@ -1474,9 +2083,13 @@
 
   var _ACRONYM_MAP = {
     'rlp': 'rockstar learning platform',
+    'rslp': 'rockstar learning platform',
     'lcs': 'learning creation studio',
+    'tlcs': 'the learning creation studio',
     'cm': 'coursemill',
+    'cml': 'coursemill',
     'ta': 'training arcade',
+    'tta': 'the training arcade',
     'cvr': 'cenariovr',
     'mb': 'microbuilder',
     'rl': 'reviewlink',
@@ -1487,37 +2100,75 @@
     'sso': 'single sign on',
     'csv': 'comma separated values',
     'rp': 'rockstar platform',
-    'dnd': 'drag and drop'
+    'dnd': 'drag and drop',
+    'lo': 'lectora online',
+    'ld': 'lectora desktop',
+    'scorm': 'scorm',
+    'vr': 'cenariovr'
   };
+
+  function isKnownAcronym(word) {
+    return !!_ACRONYM_MAP[(word || '').toLowerCase()];
+  }
 
   function expandAcronyms(query) {
     if (!query || typeof query !== 'string') return query;
-    var q = query;
-    var akeys = Object.keys(_ACRONYM_MAP);
-    akeys.sort(function (a, b) { return b.length - a.length; });
-    akeys.forEach(function (acr) {
-      var pattern = '\\b' + acr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b';
-      var testRe = new RegExp(pattern, 'gi');
-      if (testRe.test(q)) {
-        var replaceRe = new RegExp(pattern, 'gi');
-        q = q.replace(replaceRe, _ACRONYM_MAP[acr]);
+    var words = query.split(/(\s+)/);
+    var result = [];
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      if (/^\s+$/.test(w)) { result.push(w); continue; }
+      var lower = w.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (_ACRONYM_MAP[lower]) {
+        result.push(_ACRONYM_MAP[lower]);
+      } else {
+        result.push(w);
       }
-    });
-    return q;
+    }
+    return result.join('');
   }
 
   var _PRODUCT_ALIASES = {
-    'coursemill': 'coursemill', 'course mill': 'coursemill', 'course-mill': 'coursemill', 'coursemill lms': 'coursemill',
-    'lectora': 'lectora', 'lectora online': 'lectora', 'lectora desktop': 'lectora',
-    'cenariovr': 'cenariovr', 'cenario vr': 'cenariovr', 'cenario-vr': 'cenariovr', 'cenario': 'cenariovr',
-    'training arcade': 'training-arcade', 'training-arcade': 'training-arcade', 'thetrainingarcade': 'training-arcade', 'the training arcade': 'training-arcade',
-    'microbuilder': 'microbuilder', 'micro builder': 'microbuilder', 'micro-builder': 'microbuilder',
+    'coursemill': 'coursemill', 'course mill': 'coursemill', 'course-mill': 'coursemill', 'coursemill lms': 'coursemill', 'cm': 'coursemill', 'cml': 'coursemill',
+    'lectora': 'lectora', 'lectora online': 'lectora', 'lectora desktop': 'lectora', 'lo': 'lectora', 'ld': 'lectora',
+    'cenariovr': 'cenariovr', 'cenario vr': 'cenariovr', 'cenario-vr': 'cenariovr', 'cenario': 'cenariovr', 'cvr': 'cenariovr',
+    '360 degree video': 'cenariovr', '360 video': 'cenariovr', '360 degree': 'cenariovr', 'vr video': 'cenariovr',
+    'virtual reality': 'cenariovr', 'immersive': 'cenariovr', 'headset': 'cenariovr', '360\u00b0': 'cenariovr',
+    'training arcade': 'training-arcade', 'training-arcade': 'training-arcade', 'thetrainingarcade': 'training-arcade', 'the training arcade': 'training-arcade', 'arcades': 'training-arcade', 'ta': 'training-arcade', 'tta': 'training-arcade',
+    'gamification': 'training-arcade', 'training game': 'training-arcade', 'game template': 'training-arcade',
+    'microbuilder': 'microbuilder', 'micro builder': 'microbuilder', 'micro-builder': 'microbuilder', 'mb': 'microbuilder',
+    'microlearning': 'microbuilder', 'micro learning': 'microbuilder',
     'rockstar learning platform': 'rockstar', 'rockstar learning': 'rockstar', 'rockstar platform': 'rockstar', 'rockstar': 'rockstar', 'knowledgelink': 'rockstar', 'knowledge link': 'rockstar',
-    'rlp': 'rockstar',
-    'rehearsal': 'rehearsal',
-    'reviewlink': 'reviewlink', 'review link': 'reviewlink', 'review-link': 'reviewlink',
-    'learning creation studio': 'learning-creation-studio', 'the learning creation studio': 'learning-creation-studio', 'lcs': 'learning-creation-studio'
+    'rlp': 'rockstar', 'rslp': 'rockstar', 'rp': 'rockstar',
+    'rehearsal': 'rehearsal', 'video coaching': 'rehearsal', 'mentoring': 'rehearsal',
+    'reviewlink': 'reviewlink', 'review link': 'reviewlink', 'review-link': 'reviewlink', 'rl': 'reviewlink',
+    'learning creation studio': 'learning-creation-studio', 'the learning creation studio': 'learning-creation-studio', 'lcs': 'learning-creation-studio', 'tlcs': 'learning-creation-studio'
   };
+
+  function inferProductFromResults(results, topN) {
+    if (!results || results.length === 0) return null;
+    var top = results[0];
+    if (top && top.article && top.article.product && top.article.product !== 'general') {
+      if (top.normalizedScore >= 80 || top.matchPercent >= 90) return top.article.product;
+    }
+    topN = Math.min(topN || 5, results.length);
+    var counts = {};
+    var totalWeight = 0;
+    for (var i = 0; i < topN; i++) {
+      var art = results[i].article;
+      if (!art || !art.product || art.product === 'general') continue;
+      var w = topN - i;
+      counts[art.product] = (counts[art.product] || 0) + w;
+      totalWeight += w;
+    }
+    if (totalWeight === 0) return null;
+    var best = null, bestScore = 0;
+    for (var p in counts) {
+      if (counts[p] > bestScore) { bestScore = counts[p]; best = p; }
+    }
+    if (bestScore / totalWeight >= 0.35) return best;
+    return null;
+  }
 
   function detectProductFromQuery(query) {
     if (!query || typeof query !== 'string') return null;
@@ -1574,110 +2225,145 @@
   function buildActionLinks(product, query, config) {
     var p = getProductConfig(product, config);
     var kw = extractKeywords(query), searchTerm = kw.length ? kw.join(' ') : (query.trim() || 'help');
+    var draftTitle = searchTerm;
+    if (p && p.label) draftTitle += ' - ' + p.label;
+    var encodedCategory = encodeURIComponent(p.community);
+    var encodedTitle = encodeURIComponent(draftTitle);
+    var encodedQuery = encodeURIComponent(searchTerm);
+    var encodedProduct = encodeURIComponent(p.label || product || 'general');
     return {
-      postNewQuestion: COMMUNITY_BASE + '/topics/create',
-      communityCategory: COMMUNITY_BASE + '/topics?category=' + p.community + '&hsLang=en',
+      postNewQuestion: COMMUNITY_BASE + '/topics/create?category=' + encodedCategory + '&title=' + encodedTitle + '&hsLang=en',
+      communityCategory: COMMUNITY_BASE + '/topics?category=' + (p.community || 'all-things-elearning') + '&hsLang=en',
       submitTicket: SUBMIT_TICKET,
       searchTerm: searchTerm
     };
   }
 
-  function buildStarredSection(product, config, collapsed) {
+  function getQuickGuideUsage() {
+    try { return JSON.parse(localStorage.getItem(QUICK_GUIDE_USAGE_KEY) || '{}'); } catch (e) { return {}; }
+  }
+
+  function trackQuickGuideUsage(guideKey) {
+    if (!guideKey) return;
+    try {
+      var usage = getQuickGuideUsage();
+      usage[guideKey] = (usage[guideKey] || 0) + 1;
+      localStorage.setItem(QUICK_GUIDE_USAGE_KEY, JSON.stringify(usage));
+    } catch (e) { /* */ }
+  }
+
+  function getRankedQuickGuides(product, query, instructions) {
+    if (!Array.isArray(instructions) || instructions.length === 0) return [];
+    var q = sanitizeQuery(query || '');
+    if (!q) return instructions.slice(0);
+
+    var weights = _contentIndex && _contentIndex.weightConfig ? _contentIndex.weightConfig : getDefaultWeights();
+    var keywords = extractKeywords(q);
+    if (keywords.length === 0) keywords = tokenize(q);
+    var synonyms = [];
+    keywords.forEach(function (kw) {
+      getSynonyms(kw).forEach(function (s) { if (synonyms.indexOf(s) === -1 && keywords.indexOf(s) === -1) synonyms.push(s); });
+    });
+    var usage = getQuickGuideUsage();
+    var detectedProduct = detectProductFromQuery(q);
+    var qLower = q.toLowerCase();
+
+    var ranked = instructions.map(function (inst, idx) {
+      var hay = ((inst.label || '') + ' ' + (inst.tag || '') + ' ' + (inst.url || '')).toLowerCase();
+      var textScore = scoreText(hay, keywords, synonyms, weights, 'title').score;
+      var score = textScore;
+      if (hay.indexOf(qLower) >= 0) score += (weights.titleExact || 100) * 0.8;
+      if (detectedProduct && detectedProduct === product) score += (weights.productMatch || 20) * 1.5;
+      var key = product + '|' + (inst.url || '') + '|' + (inst.label || idx);
+      score += Math.min(32, (usage[key] || 0) * 4);
+      return { inst: inst, score: score };
+    });
+
+    ranked.sort(function (a, b) { return b.score - a.score; });
+    var filtered = ranked.filter(function (r) { return r.score > 0; });
+    if (filtered.length === 0) filtered = ranked;
+    return filtered.map(function (r) { return r.inst; }).slice(0, 6);
+  }
+
+  function buildQuickActionsSection(product, config, options) {
+    options = options || {};
     var p = getProductConfig(product, config);
-    var actionLinks = buildActionLinks(product, '', config);
-    var isCollapsed = !!collapsed;
-    var instructions = PRODUCT_INSTRUCTIONS[product] || PRODUCT_INSTRUCTIONS.general || [];
-
-    if (isCollapsed) {
-      var html = '<div class="zikb-starred-wrap zikb-starred-collapsed">';
-      html += '<div class="zikb-qa-compact">';
-      html += '<span class="zikb-qa-compact-label">' + svgIcon('star') + ' Quick Actions</span>';
-      html += '<span class="zikb-qa-compact-links">';
-      html += '<a href="' + esc(actionLinks.postNewQuestion) + '" target="_blank" rel="noopener" title="Post a New Question">' + svgIcon('users') + ' Ask</a>';
-      html += '<a href="' + esc(actionLinks.communityCategory) + '" target="_blank" rel="noopener" title="Browse Discussions">' + svgIcon('search') + ' Browse</a>';
-      html += '<a href="' + esc(actionLinks.submitTicket) + '" target="_blank" rel="noopener" title="Submit Support Ticket">' + svgIcon('ticket') + ' Support</a>';
-      html += '</span>';
-      html += '<span class="zikb-qa-expand-toggle" data-action="expand-starred">' + svgIcon('chevronDown') + '</span>';
-      html += '</div>';
-
-      html += '<div class="zikb-starred-expandable" style="display:none">';
-      html += '<div class="zikb-qa-card">';
-      html += '<div class="zikb-qa-header">' + svgIcon('star') + ' Quick Actions</div>';
-      html += '<div class="zikb-qa-links">';
-      html += '<a class="zikb-qa-link new-post" href="' + esc(actionLinks.postNewQuestion) + '" target="_blank" rel="noopener">';
-      html += '<span class="zikb-qa-icon community">' + svgIcon('users') + '</span>';
-      html += '<span class="zikb-qa-text"><strong>Post a New Question</strong><small>Start a discussion in the Community</small></span>';
-      html += '<span class="zikb-qa-arrow">' + svgIcon('externalLink') + '</span>';
-      html += '</a>';
-      html += '<a class="zikb-qa-link browse-comm" href="' + esc(actionLinks.communityCategory) + '" target="_blank" rel="noopener">';
-      html += '<span class="zikb-qa-icon community">' + svgIcon('search') + '</span>';
-      html += '<span class="zikb-qa-text"><strong>Browse ' + esc(p.label) + ' Discussions</strong><small>See what others are sharing</small></span>';
-      html += '<span class="zikb-qa-arrow">' + svgIcon('externalLink') + '</span>';
-      html += '</a>';
-      html += '<a class="zikb-qa-link ticket" href="' + esc(actionLinks.submitTicket) + '" target="_blank" rel="noopener">';
-      html += '<span class="zikb-qa-icon ticket">' + svgIcon('ticket') + '</span>';
-      html += '<span class="zikb-qa-text"><strong>Submit a Support Ticket</strong><small>Get personalized help from our team</small></span>';
-      html += '<span class="zikb-qa-arrow">' + svgIcon('externalLink') + '</span>';
-      html += '</a>';
-      html += '</div></div>';
-
-      if (instructions.length > 0) {
-        html += '<div class="zikb-guide-card">';
-        html += '<div class="zikb-guide-header">' + svgIcon('clipboard') + ' ' + esc(p.label) + ' Quick Start Guides</div>';
-        html += '<div class="zikb-guide-list">';
-        instructions.forEach(function (inst) {
-          var tagHtml = inst.tag ? '<span class="zikb-guide-tag">' + esc(inst.tag) + '</span>' : '';
-          html += '<a class="zikb-guide-item" href="' + esc(inst.url) + '" target="_blank" rel="noopener">';
-          html += '<span class="zikb-guide-icon">' + svgIcon('book') + '</span>';
-          html += '<span class="zikb-guide-text">' + esc(inst.label) + tagHtml + '</span>';
-          html += '<span class="zikb-qa-arrow">' + svgIcon('externalLink') + '</span>';
-          html += '</a>';
-        });
-        html += '</div></div>';
-      }
-
-      html += '</div>';
-      html += '</div>';
-      return html;
-    }
-
-    var html = '<div class="zikb-starred-wrap">';
-    html += '<div class="zikb-qa-card">';
-    html += '<div class="zikb-qa-header">' + svgIcon('star') + ' Quick Actions</div>';
-    html += '<div class="zikb-qa-links">';
+    var actionLinks = buildActionLinks(product, options.query || '', config);
+    var idPrefix = options.idPrefix || 'default';
+    var targetId = idPrefix + '-quick-actions-body';
+    var isCollapsed = !!options.collapsedByDefault;
+    var html = '<section class="zikb-ia-section zikb-ia-quick-actions zikb-tab-target zikb-tab-resources zikb-tab-all" role="region" aria-label="Quick Actions">';
+    html += '<button class="zikb-section-label zikb-accordion-label" type="button" role="heading" aria-level="3" data-accordion-target="' + targetId + '" aria-expanded="' + (!isCollapsed) + '">' + svgIcon('star') + ' Quick Actions <span class="zikb-section-count">(3)</span><span class="zikb-accordion-chevron">' + svgIcon('chevronUp') + '</span></button>';
+    html += '<div class="zikb-section-results zikb-accordion-body ' + (isCollapsed ? 'zikb-collapsed' : '') + '" id="' + targetId + '">';
+    html += '<div class="zikb-horizontal-list zikb-horizontal-actions">';
     html += '<a class="zikb-qa-link new-post" href="' + esc(actionLinks.postNewQuestion) + '" target="_blank" rel="noopener">';
     html += '<span class="zikb-qa-icon community">' + svgIcon('users') + '</span>';
-    html += '<span class="zikb-qa-text"><strong>Post a New Question</strong><small>Start a discussion in the Community</small></span>';
+    html += '<span class="zikb-qa-text"><strong>Post a Question</strong><small>' + esc(p.label) + '</small></span>';
     html += '<span class="zikb-qa-arrow">' + svgIcon('externalLink') + '</span>';
     html += '</a>';
     html += '<a class="zikb-qa-link browse-comm" href="' + esc(actionLinks.communityCategory) + '" target="_blank" rel="noopener">';
     html += '<span class="zikb-qa-icon community">' + svgIcon('search') + '</span>';
-    html += '<span class="zikb-qa-text"><strong>Browse ' + esc(p.label) + ' Discussions</strong><small>See what others are sharing</small></span>';
+    html += '<span class="zikb-qa-text"><strong>Browse Discussions</strong><small>' + esc(p.label) + '</small></span>';
     html += '<span class="zikb-qa-arrow">' + svgIcon('externalLink') + '</span>';
     html += '</a>';
     html += '<a class="zikb-qa-link ticket" href="' + esc(actionLinks.submitTicket) + '" target="_blank" rel="noopener">';
     html += '<span class="zikb-qa-icon ticket">' + svgIcon('ticket') + '</span>';
-    html += '<span class="zikb-qa-text"><strong>Submit a Support Ticket</strong><small>Get personalized help from our team</small></span>';
+    html += '<span class="zikb-qa-text"><strong>Submit a Ticket</strong><small>Support team</small></span>';
     html += '<span class="zikb-qa-arrow">' + svgIcon('externalLink') + '</span>';
     html += '</a>';
     html += '</div></div>';
+    html += '</section>';
+    return html;
+  }
 
+  function buildQuickGuidesSection(product, config, query, options) {
+    options = options || {};
+    var p = getProductConfig(product, config);
+    var instructions = PRODUCT_INSTRUCTIONS[product] || PRODUCT_INSTRUCTIONS.general || [];
+    instructions = getRankedQuickGuides(product, query || '', instructions);
+    if (instructions.length === 0) return '';
+    var idPrefix = options.idPrefix || 'default';
+    var targetId = idPrefix + '-quick-guides-body';
+    var isCollapsed = !!options.collapsedByDefault;
+
+    var html = '<section class="zikb-ia-section zikb-ia-quick-guides zikb-tab-target zikb-tab-resources zikb-tab-all" role="region" aria-label="Quick Guides">';
+    html += '<button class="zikb-section-label zikb-accordion-label" type="button" role="heading" aria-level="3" data-accordion-target="' + targetId + '" aria-expanded="' + (!isCollapsed) + '">' + svgIcon('clipboard') + ' Quick Guides: ' + esc(p.label) + ' <span class="zikb-section-count">(' + instructions.length + ')</span><span class="zikb-accordion-chevron">' + svgIcon('chevronUp') + '</span></button>';
+    html += '<div class="zikb-section-results zikb-accordion-body ' + (isCollapsed ? 'zikb-collapsed' : '') + '" id="' + targetId + '">';
     if (instructions.length > 0) {
-      html += '<div class="zikb-guide-card">';
-      html += '<div class="zikb-guide-header">' + svgIcon('clipboard') + ' ' + esc(p.label) + ' Quick Start Guides</div>';
-      html += '<div class="zikb-guide-list">';
-      instructions.forEach(function (inst) {
+      html += '<div class="zikb-horizontal-list zikb-horizontal-guides">';
+      instructions.forEach(function (inst, idx) {
         var tagHtml = inst.tag ? '<span class="zikb-guide-tag">' + esc(inst.tag) + '</span>' : '';
-        html += '<a class="zikb-guide-item" href="' + esc(inst.url) + '" target="_blank" rel="noopener">';
+        var guideKey = product + '|' + (inst.url || '') + '|' + (inst.label || idx);
+        html += '<a class="zikb-guide-item" href="' + esc(inst.url) + '" target="_blank" rel="noopener" data-guide-key="' + esc(guideKey) + '">';
         html += '<span class="zikb-guide-icon">' + svgIcon('book') + '</span>';
         html += '<span class="zikb-guide-text">' + esc(inst.label) + tagHtml + '</span>';
         html += '<span class="zikb-qa-arrow">' + svgIcon('externalLink') + '</span>';
         html += '</a>';
       });
-      html += '</div></div>';
+      html += '</div>';
     }
 
-    html += '</div>';
+    html += '</div></section>';
+    return html;
+  }
+
+  function renderRecentSearchesSection(limit, options) {
+    options = options || {};
+    var history = getHistory();
+    if (!history.length) return '';
+
+    var maxItems = Math.max(1, limit || 5);
+    var idPrefix = options.idPrefix || 'default';
+    var targetId = idPrefix + '-recent-searches-body';
+    var isCollapsed = !!options.collapsedByDefault;
+    var html = '<section class="zikb-ia-section zikb-ia-recent zikb-tab-target zikb-tab-resources zikb-tab-all" role="region" aria-label="Recent Searches">';
+    html += '<button class="zikb-section-label zikb-accordion-label" type="button" data-accordion-target="' + targetId + '" aria-expanded="' + (!isCollapsed) + '">' + svgIcon('search') + ' Recent Searches <span class="zikb-section-count">(' + history.length + ')</span><span class="zikb-accordion-chevron">' + svgIcon('chevronUp') + '</span></button>';
+    html += '<div class="zikb-accordion-body ' + (isCollapsed ? 'zikb-collapsed' : '') + '" id="' + targetId + '">';
+    html += '<div class="zikb-recent-list">';
+    history.slice(0, maxItems).forEach(function (h) {
+      html += '<span class="zikb-suggest-btn" data-suggest="' + esc(h.q) + '">' + esc(h.q) + '</span>';
+    });
+    html += '</div></div></section>';
     return html;
   }
 
@@ -1719,110 +2405,184 @@
     var s = document.createElement('style');
     s.id = 'zikb-styles-v21';
     s.textContent = [
-      '#zikb-toggle{position:fixed;bottom:24px;' + (isLeft ? 'left:24px' : 'right:24px') + ';width:56px;height:56px;border-radius:50%;background:' + btnColor + ';border:none;color:#fff;font-size:1.5rem;cursor:move;box-shadow:0 4px 16px rgba(0,0,0,.2);z-index:2147483646;transition:transform .2s;user-select:none;display:flex;align-items:center;justify-content:center}',
-      '#zikb-toggle:hover{transform:scale(1.08)}#zikb-toggle:focus-visible{outline:2px solid #fff;outline-offset:2px}#zikb-toggle.dragging{cursor:grabbing}',
-      '#zikb-panel{position:fixed;bottom:90px;' + (isLeft ? 'left:24px' : 'right:24px') + ';width:440px;max-height:600px;background:#fff;border:1px solid #e8e4df;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:2147483645;display:none;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}',
-      '#zikb-panel.open{display:flex;animation:zikb-fadeIn .18s ease-out}',
-      '@keyframes zikb-fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}',
-      '@media(max-width:480px){#zikb-panel{width:calc(100vw - 16px);left:8px!important;right:8px!important;max-height:70vh;bottom:80px!important}}',
-      '#zikb-header{padding:1rem 1.25rem;background:linear-gradient(135deg,' + headerColor + ' 0%,#f26322 100%);color:#fff;font-weight:600;display:flex;align-items:center;justify-content:space-between;cursor:grab;user-select:none}',
+      '#zikb-toggle{position:fixed;bottom:28px;' + (isLeft ? 'left:28px' : 'right:28px') + ';width:76px;height:76px;border-radius:50%;background:linear-gradient(145deg,#ff7b2e 0%,#f06410 25%,#e85d04 50%,#d14800 80%,#b83d00 100%);border:3px solid rgba(255,255,255,.9);color:#fff;cursor:move;box-shadow:0 12px 32px rgba(232,93,4,.42),0 6px 18px rgba(0,0,0,.14),inset 0 2px 4px rgba(255,255,255,.3);z-index:2147483646;transition:transform .25s cubic-bezier(.4,0,.2,1),box-shadow .25s cubic-bezier(.4,0,.2,1);user-select:none;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}',
+      '#zikb-toggle:hover{transform:translateY(-3px) scale(1.1);box-shadow:0 16px 40px rgba(232,93,4,.48),0 8px 22px rgba(0,0,0,.16),inset 0 2px 4px rgba(255,255,255,.35)}',
+      '#zikb-toggle:active{transform:scale(.93)}',
+      '#zikb-toggle:focus-visible{outline:3px solid #fff;outline-offset:4px;box-shadow:0 0 0 7px rgba(232,93,4,.45)}#zikb-toggle.dragging{cursor:grabbing}',
+      '#zikb-toggle svg{width:34px;height:34px;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.2))}',
+      '#zikb-toggle::after{content:"";position:absolute;right:6px;bottom:6px;width:16px;height:16px;background:#21c45a;border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.28);animation:zikb-pulse 2.2s ease-in-out infinite}',
+      '@keyframes zikb-pulse{0%,100%{box-shadow:0 2px 6px rgba(0,0,0,.28)}50%{box-shadow:0 2px 6px rgba(0,0,0,.28),0 0 0 6px rgba(33,196,90,.22)}}',
+      '#zikb-panel{position:fixed;bottom:120px;' + (isLeft ? 'left:24px' : 'right:24px') + ';width:440px;height:min(700px,calc(100vh - 140px));max-height:min(700px,calc(100vh - 140px));background:#fff;border:1px solid #e6dfd9;border-radius:20px;box-shadow:0 20px 56px rgba(0,0,0,.13),0 8px 20px rgba(0,0,0,.06);z-index:2147483645;display:none;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;transition:max-height .3s cubic-bezier(.4,0,.2,1),width .3s ease}',
+      '#zikb-panel.open{display:flex;animation:zikb-fadeIn .2s ease-out}',
+      '#zikb-panel.zikb-minimized{max-height:54px!important;overflow:hidden;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.15);transition:max-height .3s cubic-bezier(.4,0,.2,1),border-radius .2s}',
+      '#zikb-panel.zikb-minimized #zikb-body,#zikb-panel.zikb-minimized .zikb-powered{display:none}',
+      '#zikb-panel.zikb-minimized #zikb-header{border-radius:14px;background:linear-gradient(135deg,' + headerColor + ' 0%,#f26322 60%,#ff7b3a 100%)}',
+      '#zikb-panel.zikb-maximized{width:90vw!important;max-width:920px;max-height:90vh!important;left:5vw!important;top:5vh!important;right:auto;bottom:auto;border-radius:20px;box-shadow:0 24px 80px rgba(0,0,0,.28),0 8px 32px rgba(232,93,4,.1);transition:all .35s cubic-bezier(.4,0,.2,1)}',
+      '#zikb-panel.zikb-maximized #zikb-body{flex:1 1 auto;max-height:calc(90vh - 112px)}',
+      '@keyframes zikb-fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}',
+      '@media(max-width:768px){#zikb-panel{width:min(94vw,440px);height:calc(100vh - 128px);max-height:calc(100vh - 128px);bottom:112px!important;' + (isLeft ? 'left:12px!important;right:auto!important' : 'right:12px!important;left:auto!important') + '}#zikb-toggle{width:68px;height:68px;bottom:22px;' + (isLeft ? 'left:22px' : 'right:22px') + '}#zikb-toggle svg{width:30px;height:30px}#zikb-body{padding:10px 11px 5px}}',
+      '@media(max-width:480px){#zikb-toggle{width:64px;height:64px;bottom:16px;' + (isLeft ? 'left:16px' : 'right:16px') + '}#zikb-toggle svg{width:28px;height:28px}#zikb-panel{width:calc(100vw - 16px);left:8px!important;right:8px!important;height:calc(100vh - 108px);max-height:calc(100vh - 108px);bottom:96px!important;border-radius:16px}#zikb-panel.zikb-maximized{width:100vw!important;max-width:100vw;left:0!important;top:0!important;max-height:100vh!important;height:100vh!important;border-radius:0}#zikb-header{padding:.72rem .82rem;min-height:48px}#zikb-header .zikb-header-title{font-size:.92rem}#zikb-body{padding:8px 9px 5px}.zikb-section-label{padding:.52rem .65rem;font-size:.73rem}.zikb-result{padding:.68rem .78rem}.zikb-resource-grid{grid-template-columns:1fr}.zikb-compact-resource-row{flex-direction:column}.zikb-compact-resource-row .zikb-compact-section{flex:1 1 100%;min-width:100%}}',
+      '#zikb-header{padding:14px 18px;background:linear-gradient(135deg,' + headerColor + ' 0%,#f26322 55%,#ff7b3a 100%);color:#fff;font-weight:600;display:flex;align-items:center;justify-content:space-between;cursor:grab;user-select:none;min-height:54px;border-bottom:1px solid rgba(255,255,255,.12);border-radius:20px 20px 0 0}',
       '#zikb-header.zikb-dragging{cursor:grabbing}',
-      '#zikb-close{background:0;border:0;color:rgba(255,255,255,.95);cursor:pointer;font-size:1.4rem;padding:.2rem .4rem;border-radius:4px}#zikb-close:hover{background:rgba(255,255,255,.15)}',
-      '#zikb-body{padding:1.25rem;overflow-y:auto;flex:1;background:#faf8f5;color:#333}',
-      '#zikb-msg{font-size:.88rem;color:#5a5a5a;margin-bottom:1rem;line-height:1.5}',
-      '#zikb-search-wrap{display:flex;gap:.5rem;margin-bottom:1rem}',
-      '#zikb-search-input{flex:1;padding:.7rem 1rem;border:1px solid #e0ddd8;border-radius:8px;font-size:.93rem;font-family:inherit;background:#fff}',
-      '#zikb-search-input:focus{outline:0;border-color:' + btnColor + ';box-shadow:0 0 0 2px rgba(232,93,4,.15)}',
-      '#zikb-search-btn{padding:.7rem 1rem;background:' + btnColor + ';color:#fff;border:none;border-radius:8px;font-weight:500;cursor:pointer;font-size:.9rem}',
-      '#zikb-search-btn:hover{background:#d35400}',
-      '#zikb-results{display:flex;flex-direction:column;gap:.5rem}',
-      '.zikb-intent-tag{display:inline-block;padding:.15rem .5rem;background:rgba(232,93,4,.1);color:#c24a00;font-size:.72rem;font-weight:600;border-radius:4px;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.3px}',
-      '.zikb-section-label{font-size:.78rem;font-weight:600;color:#5a5652;margin:.75rem 0 .4rem;text-transform:uppercase;letter-spacing:.3px;display:flex;align-items:center;gap:.4rem;padding-top:.4rem;border-top:1px solid #e8e4df}',
-      '.zikb-section-label:first-child{border-top:none;padding-top:0}',
-      '.zikb-result{display:block;padding:.8rem 1rem;background:#fff;border:1px solid #e8e4df;border-radius:8px;text-decoration:none;transition:all .15s;position:relative}',
-      '.zikb-result:hover{background:#fff8f5;border-color:#e85d04}',
+      '#zikb-header .zikb-header-title{display:flex;align-items:center;gap:.46rem;font-size:.97rem;letter-spacing:.01em}',
+      '#zikb-header .zikb-header-title svg{width:17px;height:17px;opacity:.92}',
+      '.zikb-header-actions{display:flex;align-items:center;gap:.2rem;background:rgba(0,0,0,.15);border-radius:10px;padding:.2rem .25rem;backdrop-filter:blur(4px)}',
+      '.zikb-header-btn{background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;padding:.4rem;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all .2s cubic-bezier(.4,0,.2,1);position:relative}',
+      '.zikb-header-btn:hover{background:rgba(255,255,255,.2);color:#fff;transform:scale(1.1)}',
+      '.zikb-header-btn:active{transform:scale(.92);background:rgba(255,255,255,.3)}',
+      '.zikb-header-btn:focus-visible{outline:2px solid #fff;outline-offset:1px}',
+      '.zikb-header-btn svg{width:15px;height:15px}',
+      '#zikb-minimize-btn{order:1}',
+      '#zikb-maximize-btn{order:2}',
+      '#zikb-reload-btn.zikb-header-btn{order:0}',
+      '#zikb-close{color:rgba(255,255,255,.9);order:3}',
+      '#zikb-close:hover{background:rgba(255,60,60,.4);color:#fff;transform:scale(1.15)}',
+      '#zikb-close:active{background:rgba(255,60,60,.55)}',
+      '#zikb-body{padding:10px 12px 5px;overflow-y:auto;flex:1 1 auto;min-height:0;max-height:none;background:#f9f7f4;color:#333;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:rgba(232,93,4,.15) transparent;overscroll-behavior:contain}',
+      '#zikb-body::-webkit-scrollbar{width:5px}#zikb-body::-webkit-scrollbar-thumb{background:rgba(232,93,4,.15);border-radius:3px}#zikb-body::-webkit-scrollbar-thumb:hover{background:rgba(232,93,4,.3)}',
+      '#zikb-msg{font-size:.9rem;color:#4f4a45;margin-bottom:6px;line-height:1.45;padding:0 2px;flex-shrink:0}',
+      '#zikb-search-wrap{display:flex;align-items:center;position:relative;margin-bottom:8px;background:linear-gradient(135deg,#fff 0%,#fefdfb 100%);border:1.5px solid #ddd5cf;border-radius:14px;transition:all .2s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 6px rgba(0,0,0,.04);flex-shrink:0}',
+      '#zikb-search-wrap:focus-within{border-color:' + btnColor + ';box-shadow:0 0 0 4px rgba(232,93,4,.08),0 4px 16px rgba(232,93,4,.1);background:#fff}',
+      '#zikb-search-input{flex:1;padding:11px 8px 11px 12px;border:none;border-radius:14px;font-size:.9rem;font-family:inherit;background:transparent;word-wrap:break-word;overflow-wrap:break-word;min-height:42px;letter-spacing:.01em}',
+      '#zikb-search-input:focus{outline:0}',
+      '#zikb-search-input::placeholder{color:#b5b0ab;font-weight:400;font-size:.88rem}',
+      '#zikb-search-input::-ms-clear{display:none;width:0;height:0}',
+      '#zikb-search-input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}',
+      '#zikb-search-input::-webkit-search-decoration{-webkit-appearance:none;appearance:none}',
+      '#zikb-search-btn{position:absolute;right:.35rem;top:50%;transform:translateY(-50%);padding:.5rem .68rem;background:linear-gradient(135deg,' + btnColor + ' 0%,#f26322 50%,#ff7b3a 100%);color:#fff;border:none;border-radius:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.3rem;transition:all .2s cubic-bezier(.4,0,.2,1);font-size:.74rem;font-weight:600;font-family:inherit;box-shadow:0 2px 8px rgba(232,93,4,.22)}',
+      '#zikb-search-btn:hover{background:linear-gradient(135deg,#d35400,' + btnColor + ');transform:translateY(-50%) scale(1.05);box-shadow:0 4px 14px rgba(232,93,4,.35)}',
+      '#zikb-search-btn:active{transform:translateY(-50%) scale(.95);box-shadow:0 1px 4px rgba(232,93,4,.2)}',
+      '#zikb-search-btn:focus-visible{outline:2px solid ' + btnColor + ';outline-offset:2px}',
+      '#zikb-search-btn svg{width:14px;height:14px}',
+      '[data-tooltip]{position:relative}',
+      '[data-tooltip]::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:.3rem .6rem;border-radius:5px;font-size:.7rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:10}',
+      '[data-tooltip]:hover::after{opacity:1}',
+      '#zikb-results{display:flex;flex-direction:column;gap:2px;padding-bottom:0;margin-bottom:0;transition:opacity .15s ease}',
+      '#zikb-results > :last-child{margin-bottom:0!important}',
+      '.zikb-view-tabs{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:1px 0 6px;padding:0 2px}',
+      '.zikb-view-tab{border:1.5px solid #e2d8cf;background:#fff;border-radius:999px;padding:6px 13px;font-size:11.5px;font-weight:600;color:#6b5d52;cursor:pointer;transition:all .18s;white-space:nowrap}',
+      '.zikb-view-tab:hover{border-color:#e85d04;color:#c24a00;background:#fff8f5}',
+      '.zikb-view-tab.active{background:linear-gradient(135deg,#e85d04 0%,#f26322 100%);border-color:#e85d04;color:#fff;box-shadow:0 2px 8px rgba(232,93,4,.26)}',
+      '.zikb-tab-target.zikb-hidden{display:none!important}',
+      '.zikb-compact-resource-row{display:flex;align-items:stretch;gap:10px;flex-wrap:nowrap;overflow-x:auto;padding:4px 0 8px;scrollbar-width:thin;scrollbar-color:rgba(232,93,4,.12) transparent}',
+      '.zikb-compact-resource-row::-webkit-scrollbar{height:3px}.zikb-compact-resource-row::-webkit-scrollbar-thumb{background:rgba(232,93,4,.12);border-radius:2px}',
+      '.zikb-compact-resource-row .zikb-compact-section{flex:1 1 calc(50% - 5px);min-width:calc(50% - 5px)}',
+      '.zikb-compact-section{margin:0}',
+      '.zikb-compact-section .zikb-section-label{margin:0;border-radius:10px;font-size:11.5px}',
+      '.zikb-compact-section .zikb-accordion-body{margin-top:4px;min-width:0}',
+      '.zikb-compact-pill{display:inline-flex;align-items:center;gap:6px;width:auto;min-height:34px;padding:7px 14px;border-radius:10px;background:#fff;border:1.5px solid #e5ddd7;box-shadow:0 1px 4px rgba(0,0,0,.04);font-size:12px;font-weight:700;color:#6b5d52;transition:all .18s}',
+      '.zikb-compact-pill:hover{border-color:' + btnColor + ';color:#c24a00;background:#fff8f5;box-shadow:0 2px 8px rgba(232,93,4,.1)}',
+      '.zikb-compact-pill[aria-expanded="true"]{background:linear-gradient(135deg,#fff8f5,#fff);border-color:#e7b08f;color:#aa3f00}',
+      '.zikb-compact-pill svg{width:12px;height:12px;flex-shrink:0}',
+      '.zikb-resource-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}',
+      '.zikb-resource-grid .zikb-ia-section{margin:0}',
+      '.zikb-resource-grid .zikb-section-label{font-size:11px;padding:9px 12px}',
+      '.zikb-resource-grid .zikb-qa-card,.zikb-resource-grid .zikb-guide-card{margin-bottom:0}',
+      '#zikb-results.zikb-results-fading{opacity:.3;pointer-events:none}',
+      '.zikb-typing-hint{display:flex;align-items:center;gap:.5rem;padding:1.2rem 1rem;color:#9a9590;font-size:.84rem;justify-content:center;animation:zikb-fadeIn .2s ease-out}',
+      '.zikb-typing-hint kbd{display:inline-block;padding:.18rem .5rem;background:#fff;border:1.5px solid #d4d0cc;border-radius:6px;font-size:.76rem;font-family:inherit;color:#5a5652;box-shadow:0 1px 3px rgba(0,0,0,.06)}',
+      '.zikb-typing-hint strong{color:#5a5652;font-weight:600}',
+      '.zikb-typing-hint svg{opacity:.5}',
+      '.zikb-clear-results-bar{display:flex;align-items:center;justify-content:space-between;padding:.38rem .62rem;background:linear-gradient(135deg,#fff8f5,#fef5ee);border:1.5px solid #f0dcd0;border-radius:12px;margin-bottom:2px;font-size:.78rem;color:#8a6d5a;gap:.45rem}',
+      '.zikb-clear-results-bar .zikb-clear-results-info{display:flex;align-items:center;gap:.45rem;flex:1;min-width:0}',
+      '.zikb-clear-results-query{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:#5a5652;font-size:.78rem}',
+      '.zikb-clear-results-count{font-size:.73rem;color:#999;white-space:nowrap}',
+      '.zikb-clear-results-btn{background:none;border:1.5px solid #e0c8b8;color:#c24a00;cursor:pointer;padding:.32rem .72rem;border-radius:8px;font-size:.74rem;font-family:inherit;font-weight:600;transition:all .18s;display:flex;align-items:center;gap:.3rem;white-space:nowrap;flex-shrink:0}',
+      '.zikb-clear-results-btn:hover{background:#c24a00;color:#fff;border-color:#c24a00;box-shadow:0 2px 6px rgba(194,74,0,.2)}',
+      '.zikb-intent-tag{display:inline-block;padding:.18rem .55rem;background:rgba(232,93,4,.1);color:#c24a00;font-size:.72rem;font-weight:600;border-radius:6px;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.35px}',
+      '.zikb-ia-section{margin:1px 0 2px}',
+      '.zikb-section-label{font-size:12px;font-weight:700;color:#2d2a26;margin:2px 0 2px;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-top:none;background:linear-gradient(135deg,#f8f6f3 0%,#fff 50%,#fff8f5 100%);border:1.5px solid #e8e4df;border-radius:12px;user-select:none;box-shadow:0 1px 4px rgba(0,0,0,.03);transition:all .15s}',
+      '.zikb-section-label:hover{border-color:#d4cdc5;box-shadow:0 2px 8px rgba(0,0,0,.05)}',
+      '.zikb-section-label-static{justify-content:flex-start;gap:8px}',
+      '.zikb-section-count{font-size:.72rem;color:#8a6d5a;font-weight:600;background:rgba(232,93,4,.07);padding:2px 9px;border-radius:999px}',
+      '.zikb-section-label:first-child{margin-top:0}',
+      '.zikb-accordion-label{width:100%;border:1.5px solid #e8e4df;cursor:pointer;text-align:left}',
+      '.zikb-accordion-chevron{display:inline-flex;align-items:center;margin-left:auto;opacity:.6;transition:opacity .15s}',
+      '.zikb-section-label:hover .zikb-accordion-chevron{opacity:1}',
+      '.zikb-accordion-chevron svg{width:14px;height:14px;transition:transform .2s ease}',
+      '.zikb-accordion-label[aria-expanded="false"] .zikb-accordion-chevron svg{transform:rotate(180deg)}',
+      '.zikb-accordion-body{overflow:hidden;transition:max-height .2s ease,opacity .2s ease;max-height:3200px;opacity:1;margin-top:1px}',
+      '.zikb-accordion-body.zikb-collapsed{max-height:0;opacity:0;margin:0!important;padding:0}',
+      '.zikb-result{display:block;padding:10px 12px;background:#fff;border:1.5px solid #e8e4df;border-radius:12px;text-decoration:none;transition:all .2s cubic-bezier(.4,0,.2,1);position:relative}',
+      '.zikb-result:hover{background:linear-gradient(135deg,#fff8f5,#fff);border-color:#e85d04;box-shadow:0 4px 14px rgba(232,93,4,.1);transform:translateY(-1px)}',
+      '.zikb-result:active{transform:translateY(0)}',
       '.zikb-result.kb{border-left:4px solid ' + btnColor + '}.zikb-result.community{border-left:4px solid #f26322}',
-      '.zikb-result-title{font-size:.88rem;font-weight:600;color:#2d2a26;margin-bottom:.25rem}',
-      '.zikb-result-snippet{font-size:.8rem;color:#666;line-height:1.45}',
-      '.zikb-result-meta{display:flex;align-items:center;gap:.4rem;margin-top:.35rem;flex-wrap:wrap}',
-      '.zikb-badge{display:inline-flex;align-items:center;gap:.2rem;padding:.1rem .4rem;font-size:.68rem;font-weight:600;border-radius:3px}',
+      '.zikb-result-title{font-size:13.5px;font-weight:600;color:#2d2a26;margin-bottom:5px;line-height:1.35}',
+      '.zikb-result-snippet{font-size:12.5px;color:#555;line-height:1.55;max-height:72px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;word-break:break-word;transition:max-height .35s cubic-bezier(.4,0,.2,1)}',
+      '.zikb-result:hover .zikb-result-snippet,.zikb-result:focus-within .zikb-result-snippet{max-height:12em;-webkit-line-clamp:unset;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(232,93,4,.2) transparent}',
+      '.zikb-result:hover .zikb-result-snippet::-webkit-scrollbar{width:3px}',
+      '.zikb-result:hover .zikb-result-snippet::-webkit-scrollbar-thumb{background:rgba(232,93,4,.2);border-radius:2px}',
+      '.zikb-result-meta{display:flex;align-items:center;gap:.35rem;margin-top:.4rem;flex-wrap:wrap}',
+      '.zikb-badge{display:inline-flex;align-items:center;gap:.2rem;padding:.15rem .45rem;font-size:.68rem;font-weight:600;border-radius:4px;line-height:1.3}',
       '.zikb-badge-solved{background:#d4edda;color:#155724}.zikb-badge-section{background:#e8f0fe;color:#1a56db}',
       '.zikb-badge-score{background:#f0ebff;color:#5b21b6;font-variant-numeric:tabular-nums}',
       'mark.zikb-hl-exact{background:#fff3cd;color:#7c6a00;padding:0 .1rem;border-radius:2px}',
       'mark.zikb-hl-partial{background:#fce8d4;color:#9a5a00;padding:0 .1rem;border-radius:2px}',
       'mark.zikb-hl-synonym{background:#d4e8fc;color:#1a4a8a;padding:0 .1rem;border-radius:2px}',
-      '.zikb-expand{margin-top:.5rem;background:#faf8f5;border:1px solid #eee;border-radius:6px;padding:.7rem;font-size:.8rem;color:#444;line-height:1.55;display:none}',
+      '.zikb-expand{margin-top:.5rem;background:linear-gradient(135deg,#faf8f5,#fff);border:1.5px solid #f0e6dd;border-radius:12px;padding:.9rem;font-size:.82rem;color:#444;line-height:1.65;display:none;max-height:240px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(232,93,4,.25) transparent;animation:zikb-expandIn .35s cubic-bezier(.4,0,.2,1);box-shadow:inset 0 1px 3px rgba(0,0,0,.04)}',
       '.zikb-expand.open{display:block}',
+      '@keyframes zikb-expandIn{from{opacity:0;max-height:0;transform:translateY(-4px)}to{opacity:1;max-height:240px;transform:translateY(0)}}',
+      '.zikb-expand::-webkit-scrollbar{width:4px}',
+      '.zikb-expand::-webkit-scrollbar-thumb{background:rgba(232,93,4,.25);border-radius:2px}',
       '.zikb-expand-toggle{font-size:.75rem;color:#c24a00;cursor:pointer;text-decoration:underline;margin-top:.3rem;display:inline-block}',
       '.zikb-fb{display:flex;gap:.3rem;margin-top:.35rem}',
-      '.zikb-fb-btn{padding:.15rem .4rem;background:#f5f3f0;border:1px solid #e8e4df;border-radius:3px;font-size:.68rem;cursor:pointer;color:#888;transition:all .15s}',
-      '.zikb-fb-btn:hover{border-color:#e85d04;color:#c24a00}',
+      '.zikb-fb-btn{padding:.18rem .45rem;background:#f5f3f0;border:1.5px solid #e8e4df;border-radius:5px;font-size:.68rem;cursor:pointer;color:#888;transition:all .18s}',
+      '.zikb-fb-btn:hover{border-color:#e85d04;color:#c24a00;background:#fff8f5}',
       '.zikb-fb-btn.active-up{background:#d4edda;color:#155724;border-color:#28a745}',
       '.zikb-fb-btn.active-down{background:#f8d7da;color:#721c24;border-color:#dc3545}',
-      '.zikb-more-btn{padding:.6rem;background:#f5f3f0;border:1px solid #e8e4df;border-radius:8px;color:#5a5652;font-size:.82rem;text-align:center;cursor:pointer}',
-      '.zikb-more-btn:hover{background:#fff8f5;color:#c24a00;border-color:#e85d04}',
-      '.zikb-link{display:block;padding:.65rem 1rem;background:#fff;border:1px solid #e8e4df;border-radius:8px;color:#c24a00;font-size:.86rem;text-decoration:none;transition:all .15s;margin-top:.35rem}',
-      '.zikb-link:hover{background:#fff8f5;border-color:#e85d04}.zikb-link.ticket{border-left:4px solid #d35400}',
-      '.zikb-divider{border:0;border-top:1px solid #e8e4df;margin:.75rem 0}',
-      '.zikb-starred-wrap{position:sticky;top:0;z-index:10;margin:-1.25rem -1.25rem .85rem;padding:.75rem 1rem;background:linear-gradient(135deg,#fffaf6 0%,#fff4ec 100%);border-bottom:2px solid #f0e6dd;box-shadow:0 2px 8px rgba(232,93,4,.08)}',
-      '.zikb-starred-collapsed{padding:.35rem .75rem}',
-      '.zikb-starred-collapsed.zikb-starred-expanded>.zikb-qa-compact{border-bottom:1px solid #f0e6dd;padding-bottom:.35rem;margin-bottom:.4rem}',
-      '.zikb-starred-collapsed.zikb-starred-expanded>.zikb-starred-expandable{display:block!important}',
-      '.zikb-starred-collapsed>.zikb-starred-expandable .zikb-qa-card{margin-bottom:.5rem}',
-      '.zikb-starred-collapsed>.zikb-starred-expandable .zikb-guide-card{margin-bottom:.35rem}',
-      '.zikb-starred-collapsed>.zikb-starred-expandable .zikb-guide-list{max-height:140px;overflow-y:auto}',
-      '.zikb-qa-compact{display:flex;align-items:center;gap:.5rem}',
-      '.zikb-qa-compact-label{display:flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:700;color:#c24a00;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}',
-      '.zikb-qa-compact-label svg{width:12px;height:12px}',
-      '.zikb-qa-compact-links{display:flex;align-items:center;gap:.35rem;flex:1}',
-      '.zikb-qa-compact-links a{display:inline-flex;align-items:center;gap:.2rem;padding:.2rem .5rem;background:#fff;border:1px solid #e8e4df;border-radius:5px;font-size:.7rem;font-weight:500;color:#5a5652;text-decoration:none;transition:all .15s;white-space:nowrap}',
-      '.zikb-qa-compact-links a:hover{border-color:#e85d04;color:#c24a00;background:#fff8f5}',
-      '.zikb-qa-compact-links a svg{width:10px;height:10px}',
-      '.zikb-qa-expand-toggle{cursor:pointer;padding:.15rem;border-radius:4px;color:#999;display:flex;align-items:center;transition:all .15s;flex-shrink:0}',
-      '.zikb-qa-expand-toggle:hover{color:#e85d04;background:rgba(232,93,4,.06)}',
-      '.zikb-qa-card{background:linear-gradient(135deg,#fff9f5 0%,#fff 100%);border:1px solid #f0e6dd;border-radius:12px;overflow:hidden;margin-bottom:.75rem}',
-      '.zikb-qa-header{display:flex;align-items:center;gap:.4rem;padding:.6rem .85rem;background:linear-gradient(135deg,#e85d04 0%,#f26322 100%);color:#fff;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px}',
-      '.zikb-qa-header svg{width:14px;height:14px}',
-      '.zikb-qa-links{padding:.5rem}',
-      '.zikb-qa-link{display:flex;align-items:center;gap:.6rem;padding:.6rem .7rem;border-radius:8px;text-decoration:none;color:#2d2a26;transition:all .18s;margin-bottom:2px}',
-      '.zikb-qa-link:hover{background:#fff8f5;transform:translateX(3px)}',
-      '.zikb-qa-link:active{transform:translateX(1px)}',
-      '.zikb-qa-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
+      '.zikb-more-btn{padding:.55rem;background:#f5f3f0;border:1.5px solid #e8e4df;border-radius:10px;color:#5a5652;font-size:.8rem;text-align:center;cursor:pointer;transition:all .18s;font-weight:500}',
+      '.zikb-more-btn:hover{background:#fff8f5;color:#c24a00;border-color:#e85d04;box-shadow:0 2px 6px rgba(232,93,4,.1)}',
+      '.zikb-link{display:block;padding:.7rem 1rem;background:#fff;border:1.5px solid #e8e4df;border-radius:10px;color:#c24a00;font-size:.86rem;text-decoration:none;transition:all .18s;margin-top:.4rem}',
+      '.zikb-link:hover{background:#fff8f5;border-color:#e85d04;box-shadow:0 2px 8px rgba(232,93,4,.08)}.zikb-link.ticket{border-left:4px solid #d35400}',
+      '.zikb-divider{border:0;border-top:1.5px solid #efe9e3;margin:.25rem 0}',
+      '.zikb-resource-masonry{display:flex;gap:8px;align-items:stretch;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin;scrollbar-color:rgba(232,93,4,.12) transparent;scroll-snap-type:x proximity}',
+      '.zikb-resource-masonry::-webkit-scrollbar{height:3px}.zikb-resource-masonry::-webkit-scrollbar-thumb{background:rgba(232,93,4,.12);border-radius:2px}',
+      '.zikb-resource-masonry .zikb-ia-section{margin:0;flex:1 1 calc(50% - 4px);min-width:calc(50% - 4px);scroll-snap-align:start}',
+      '.zikb-horizontal-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:8px;overflow:visible;padding:6px 0 2px}',
+      '.zikb-horizontal-actions{grid-template-columns:repeat(2,minmax(0,1fr))}',
+      '.zikb-horizontal-guides{grid-template-columns:repeat(2,minmax(0,1fr))}',
+      '.zikb-qa-link{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:10px;text-decoration:none;color:#2d2a26;transition:all .18s;margin:0;min-width:0;background:#fff;border:1.5px solid #e8e4df}',
+      '.zikb-qa-link:hover{background:#fff8f5;border-color:#e7b08f;transform:translateY(-1px)}',
+      '.zikb-qa-link:active{transform:translateY(0)}',
+      '.zikb-qa-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
       '.zikb-qa-icon.community{background:linear-gradient(135deg,#f26322,#e85d04);color:#fff}',
       '.zikb-qa-icon.ticket{background:linear-gradient(135deg,#d35400,#b34700);color:#fff}',
       '.zikb-qa-icon svg{width:15px;height:15px}',
-      '.zikb-qa-text{flex:1;line-height:1.3}',
-      '.zikb-qa-text strong{display:block;font-size:.82rem;font-weight:600;color:#2d2a26}',
-      '.zikb-qa-text small{font-size:.72rem;color:#888;font-weight:400}',
-      '.zikb-qa-arrow{opacity:.35;flex-shrink:0}',
+      '.zikb-qa-text{flex:1;line-height:1.35}',
+      '.zikb-qa-text strong{display:block;font-size:12.5px;font-weight:600;color:#2d2a26}',
+      '.zikb-qa-text small{font-size:11px;color:#888;font-weight:400}',
+      '.zikb-qa-arrow{opacity:.3;flex-shrink:0;transition:all .18s}',
       '.zikb-qa-arrow svg{width:13px;height:13px}',
-      '.zikb-qa-link:hover .zikb-qa-arrow{opacity:.8;color:#e85d04}',
-      '.zikb-guide-card{background:#fff;border:1px solid #e8e4df;border-radius:12px;overflow:hidden;margin-bottom:.5rem}',
-      '.zikb-guide-header{display:flex;align-items:center;gap:.4rem;padding:.55rem .85rem;background:#f7f5f2;border-bottom:1px solid #e8e4df;font-size:.76rem;font-weight:700;color:#5a5652;text-transform:uppercase;letter-spacing:.4px}',
-      '.zikb-guide-header svg{width:13px;height:13px;color:' + btnColor + '}',
-      '.zikb-guide-list{padding:.35rem .5rem}',
-      '.zikb-guide-item{display:flex;align-items:center;gap:.55rem;padding:.5rem .6rem;border-radius:7px;text-decoration:none;color:#2d2a26;font-size:.82rem;transition:all .15s;border-left:3px solid transparent;margin-bottom:1px}',
-      '.zikb-guide-item:hover{background:#fff8f5;border-left-color:' + btnColor + ';transform:translateX(2px)}',
+      '.zikb-qa-link:hover .zikb-qa-arrow{opacity:.8;color:#e85d04;transform:translateX(2px)}',
+      '.zikb-qa-inline{display:flex;align-items:center;gap:8px;padding:10px 12px;background:linear-gradient(135deg,#fff8f2,#fff);border:1.5px solid #f0dfd2;border-radius:12px;overflow-x:auto;scrollbar-width:none}',
+      '.zikb-qa-inline::-webkit-scrollbar{display:none}',
+      '.zikb-qa-inline-label{display:inline-flex;align-items:center;gap:5px;color:#c24a00;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;flex-shrink:0}',
+      '.zikb-qa-chip{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;background:#fff;border:1.5px solid #e8ddd3;border-radius:10px;color:#5a4a3e;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;flex-shrink:0;transition:all .18s ease;box-shadow:0 1px 3px rgba(0,0,0,.03)}',
+      '.zikb-qa-chip:hover{border-color:#e85d04;color:#c24a00;background:#fff8f3;box-shadow:0 2px 8px rgba(232,93,4,.1);transform:translateY(-1px)}',
+      '.zikb-qa-chip svg{width:12px;height:12px;flex-shrink:0}',
+      '.zikb-guide-item{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:10px;text-decoration:none;color:#2d2a26;font-size:12.5px;transition:all .18s;border:1.5px solid #e8e4df;min-width:0;background:#fff;margin:0}',
+      '.zikb-guide-item:hover{background:#fff8f5;border-color:' + btnColor + ';transform:translateY(-1px)}',
       '.zikb-guide-icon{color:' + btnColor + ';flex-shrink:0;opacity:.7}',
       '.zikb-guide-icon svg{width:14px;height:14px}',
       '.zikb-guide-text{flex:1;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}',
       '.zikb-guide-tag{display:inline-block;padding:.1rem .4rem;background:rgba(232,93,4,.08);color:#c24a00;font-size:.65rem;font-weight:600;border-radius:3px;text-transform:uppercase;letter-spacing:.3px}',
       '.zikb-guide-item:hover .zikb-qa-arrow{opacity:.8;color:' + btnColor + '}',
-      '.zikb-no-match{background:#fff8f5;border:1px solid #fce8d4;border-radius:8px;padding:1rem;margin-bottom:.75rem}',
+      '.zikb-no-match{background:#fff8f5;border:1.5px solid #fce8d4;border-radius:12px;padding:.7rem .9rem;margin-bottom:4px}',
       '.zikb-no-match strong{display:block;font-size:.88rem;color:#c24a00;margin-bottom:.4rem}',
       '.zikb-no-match p{font-size:.82rem;color:#666;margin:0 0 .5rem}',
-      '.zikb-no-section-results{font-size:.8rem;color:#999;font-style:italic;padding:.4rem 0 .2rem}',
-      '.zikb-low-conf{background:#fff8f5;border:1px solid #fce8d4;border-radius:8px;padding:1rem;margin-bottom:.75rem}',
+      '.zikb-no-section-results{font-size:.8rem;color:#999;font-style:italic;padding:.5rem 0 .25rem}',
+      '.zikb-low-conf{background:#fff8f5;border:1.5px solid #fce8d4;border-radius:12px;padding:.7rem .9rem;margin-bottom:4px}',
       '.zikb-low-conf-title{font-size:.85rem;font-weight:600;color:#c24a00;margin-bottom:.5rem}',
-      '.zikb-suggest-btn{display:inline-block;padding:.3rem .6rem;background:#fff;border:1px solid #e8e4df;border-radius:6px;color:#5a5652;font-size:.8rem;cursor:pointer;margin:.15rem}',
-      '.zikb-suggest-btn:hover{border-color:#e85d04;color:#c24a00;background:#fff8f5}',
+      '.zikb-suggest-list{display:flex;flex-wrap:wrap;gap:5px;padding:4px 0 4px}',
+      '.zikb-suggest-btn{display:inline-block;padding:.35rem .7rem;background:#fff;border:1.5px solid #e8e4df;border-radius:8px;color:#5a5652;font-size:.8rem;cursor:pointer;transition:all .18s;box-shadow:0 1px 3px rgba(0,0,0,.03)}',
+      '.zikb-suggest-btn:hover{border-color:#e85d04;color:#c24a00;background:#fff8f5;box-shadow:0 2px 8px rgba(232,93,4,.1);transform:translateY(-1px)}',
       '.zikb-loading{text-align:center;padding:1.5rem;color:#888}.zikb-loading-dot{display:inline-block;width:6px;height:6px;background:#ccc;border-radius:50%;margin:0 2px;animation:zikb-b .8s infinite}',
       '.zikb-loading-dot:nth-child(2){animation-delay:.15s}.zikb-loading-dot:nth-child(3){animation-delay:.3s}',
       '@keyframes zikb-b{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}',
       '.zikb-match-nav{display:flex;align-items:center;gap:.25rem;margin-top:.3rem;flex-wrap:wrap}',
       '.zikb-match-nav-btn{padding:.12rem .35rem;background:#f5f3f0;border:1px solid #e8e4df;border-radius:3px;color:#888;font-size:.68rem;cursor:pointer;text-decoration:none}',
       '.zikb-match-nav-btn:hover{color:#c24a00;border-color:#e85d04}',
-      '.zikb-index-warn{background:#fef3cd;border:1px solid #ffc107;border-radius:8px;padding:.8rem 1rem;margin-bottom:.75rem;font-size:.82rem;color:#856404}',
+      '.zikb-index-warn{background:#fef3cd;border:1.5px solid #ffc107;border-radius:12px;padding:.8rem .9rem;margin-bottom:8px;font-size:.82rem;color:#856404}',
       '.zikb-index-warn strong{display:block;margin-bottom:.25rem}',
       '.zikb-index-loading{padding:.6rem;font-size:.82rem;color:#666}',
       '.zikb-index-loading svg{width:14px;height:14px;vertical-align:middle;margin-right:.35rem;animation:zikb-spin .7s linear infinite}',
@@ -1830,9 +2590,16 @@
       '#zikb-reload-btn:hover{background:rgba(255,255,255,.15)}',
       '#zikb-reload-btn.zikb-spinning svg{animation:zikb-spin .7s linear}',
       '@keyframes zikb-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}',
-      '#zikb-clear-btn{background:0;border:0;color:#999;cursor:pointer;padding:.4rem;border-radius:50%;display:flex;align-items:center;transition:color .15s}',
-      '#zikb-clear-btn:hover{color:#c24a00}',
-      '.zikb-error-panel{background:#fef3f2;border:1px solid #f5c2c0;border-radius:8px;padding:1rem;margin-bottom:.75rem}',
+      '.zikb-section-results{overflow:visible}',
+      '.zikb-section-results-scroll{max-height:none;overflow:visible;padding-right:0}',
+      '.zikb-recent-list{display:flex;flex-wrap:wrap;gap:5px;padding:4px 0 0}',
+      '@media(max-width:700px){.zikb-resource-masonry .zikb-ia-section{min-width:calc(50% - 4px)}.zikb-horizontal-list{grid-template-columns:1fr}}',
+      '@media(max-width:480px){.zikb-resource-grid{grid-template-columns:1fr}}',
+      '*:focus-visible{outline:2px solid ' + btnColor + ';outline-offset:2px;border-radius:3px}',
+      '.zikb-result:focus-within{border-color:' + btnColor + ';box-shadow:0 0 0 2px rgba(232,93,4,.12)}',
+      '.zikb-skip-link{position:absolute;top:-40px;left:0;background:' + btnColor + ';color:#fff;padding:.5rem 1rem;z-index:100;font-size:.85rem;border-radius:0 0 6px 0;transition:top .2s}',
+      '.zikb-skip-link:focus{top:0}',
+      '.zikb-error-panel{background:#fef3f2;border:1.5px solid #f5c2c0;border-radius:12px;padding:.9rem 1rem;margin-bottom:8px}',
       '.zikb-error-panel strong{display:block;color:#991b1b;font-size:.88rem;margin-bottom:.4rem}',
       '.zikb-error-panel p{font-size:.82rem;color:#7f1d1d;margin:0 0 .5rem}',
       '.zikb-retry-btn{padding:.35rem .7rem;background:#e85d04;color:#fff;border:none;border-radius:6px;font-size:.8rem;cursor:pointer;font-family:inherit}',
@@ -1842,8 +2609,10 @@
       '.zikb-status-offline{background:#f8d7da;color:#721c24}',
       '.zikb-status-loading{background:#fff3cd;color:#856404}',
       '.zikb-kbd-hint{font-size:.65rem;color:rgba(255,255,255,.6);margin-left:.25rem}',
-      '.zikb-powered{text-align:center;padding:.5rem;font-size:.68rem;color:#bbb;border-top:1px solid #f0eeeb}',
-      '.zikb-spell{background:#e8f4fd;border:1px solid #b3d7f0;border-radius:8px;padding:.65rem 1rem;margin-bottom:.75rem;font-size:.82rem;color:#1a5276}',
+      '.zikb-powered{text-align:center;padding:.32rem .6rem .38rem;font-size:.68rem;color:#bbb;border-top:1.5px solid #f0eeeb;background:#fafaf8;border-radius:0 0 20px 20px;flex:0 0 auto;line-height:1.2}',
+      '@media(prefers-reduced-motion:reduce){#zikb-panel,#zikb-toggle,.zikb-result,.zikb-section-results{transition:none!important;animation:none!important}}',
+      '.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}',
+      '.zikb-spell{background:#e8f4fd;border:1.5px solid #b3d7f0;border-radius:12px;padding:.65rem .9rem;margin-bottom:8px;font-size:.82rem;color:#1a5276}',
       '.zikb-spell-link{color:#c24a00;cursor:pointer;font-weight:600;text-decoration:underline}',
       '.zikb-spell-link:hover{color:#e85d04}',
       '.zikb-spell-orig{color:#888;font-size:.75rem;font-style:italic}',
@@ -1864,7 +2633,7 @@
 
   function svgIcon(name) {
     var icons = {
-      chat:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+      chat:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/><circle cx="8.5" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="11.5" r="1" fill="currentColor" stroke="none"/></svg>',
       book:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
       users:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
       check:'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>',
@@ -1879,9 +2648,15 @@
       star:'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
       externalLink:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>',
       clipboard:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>',
-      chevronDown:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>',
-      chevronUp:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>',
-      grip:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1.5" fill="currentColor"/><circle cx="15" cy="5" r="1.5" fill="currentColor"/><circle cx="9" cy="12" r="1.5" fill="currentColor"/><circle cx="15" cy="12" r="1.5" fill="currentColor"/><circle cx="9" cy="19" r="1.5" fill="currentColor"/><circle cx="15" cy="19" r="1.5" fill="currentColor"/></svg>'
+      chevronDown:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>',
+      chevronUp:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>',
+      grip:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1.5" fill="currentColor"/><circle cx="15" cy="5" r="1.5" fill="currentColor"/><circle cx="9" cy="12" r="1.5" fill="currentColor"/><circle cx="15" cy="12" r="1.5" fill="currentColor"/><circle cx="9" cy="19" r="1.5" fill="currentColor"/><circle cx="15" cy="19" r="1.5" fill="currentColor"/></svg>',
+      minimize:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"/></svg>',
+      maximize:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>',
+      restore:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M7 5V3h14v14h-2"/></svg>',
+      enter:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 10l-5 5 5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>',
+      collapseAll:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/></svg>',
+      expandAll:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg>'
     };
     return icons[name] || icons.book;
   }
@@ -1906,14 +2681,16 @@
     var uid = 'zr-' + idx;
     var scoreDisplay = (r.normalizedScore * 100).toFixed(0);
 
-    var html = '<div class="zikb-result ' + cssType + '"' +
+    var html = '<article class="zikb-result ' + cssType + '"' +
+      ' role="listitem" tabindex="0"' +
       ' data-article-id="' + esc(article.id) + '"' +
       ' data-article-url="' + esc(article.url) + '"' +
       ' data-anchor-id="' + esc(anchor) + '"' +
       ' data-relevance-score="' + esc(String(r.normalizedScore.toFixed(3))) + '"' +
       ' data-match-type="' + esc(cssType) + '"' +
       ' data-solved="' + (article.solved ? 'true' : 'false') + '"' +
-      ' data-idx="' + idx + '">';
+      ' data-idx="' + idx + '"' +
+      ' aria-label="' + esc(article.title || 'Result') + ' - ' + scoreDisplay + '% match">';
     html += '<a href="' + esc(deepUrl) + '" target="_blank" rel="noopener" class="zikb-result-link" data-article-id="' + esc(article.id) + '" style="text-decoration:none;color:inherit;display:block">';
     html += '<div class="zikb-result-title">' + highlightWithTypes(article.title || 'Untitled', keywords, synonymList) + '</div>';
 
@@ -1921,8 +2698,16 @@
       html += '<div class="zikb-result-snippet">' + highlightWithTypes(snippetText, keywords, synonymList) + '</div>';
     }
 
+    var productLabel = (article.product || 'general').replace(/-/g, ' ');
+    productLabel = productLabel.charAt(0).toUpperCase() + productLabel.slice(1);
+    var sectionLabel = '';
+    if (article.url && /release-notes/i.test(article.url)) sectionLabel = 'Release Notes';
+    else if (article.url && /getting-started/i.test(article.url)) sectionLabel = 'Getting Started';
+
     html += '<div class="zikb-result-meta">';
     html += '<span class="zikb-badge zikb-badge-score">' + scoreDisplay + '% match</span>';
+    html += '<span class="zikb-badge" style="background:#eef5ff;color:#1f4f93">' + esc(productLabel) + '</span>';
+    if (sectionLabel) html += '<span class="zikb-badge" style="background:#fff0e6;color:#b45309">' + esc(sectionLabel) + '</span>';
     if (article.solved) html += '<span class="zikb-badge zikb-badge-solved">' + svgIcon('check') + ' Solved</span>';
     if (topPara && topPara.sectionHeading) html += '<span class="zikb-badge zikb-badge-section">\u00a7 ' + esc(topPara.sectionHeading) + '</span>';
     else if (topSection && topSection.heading) html += '<span class="zikb-badge zikb-badge-section">\u00a7 ' + esc(topSection.heading) + '</span>';
@@ -1947,12 +2732,12 @@
       html += '</div>';
     }
 
-    html += '<div class="zikb-fb">';
-    html += '<span class="zikb-fb-btn" data-fb="up" data-aid="' + esc(article.id) + '">' + svgIcon('thumbUp') + ' Helpful</span>';
-    html += '<span class="zikb-fb-btn" data-fb="down" data-aid="' + esc(article.id) + '">' + svgIcon('thumbDown') + '</span>';
+    html += '<div class="zikb-fb" role="group" aria-label="Rate this result">';
+    html += '<button class="zikb-fb-btn" data-fb="up" data-aid="' + esc(article.id) + '" aria-label="Mark as helpful" data-tooltip="Helpful">' + svgIcon('thumbUp') + ' <span class="sr-only">Helpful</span></button>';
+    html += '<button class="zikb-fb-btn" data-fb="down" data-aid="' + esc(article.id) + '" aria-label="Mark as not helpful" data-tooltip="Not helpful">' + svgIcon('thumbDown') + '</button>';
     html += '</div>';
 
-    html += '</div>';
+    html += '</article>';
     return html;
   }
 
@@ -1960,9 +2745,21 @@
     _resultsEl.innerHTML = '<div class="zikb-loading"><span class="zikb-loading-dot"></span><span class="zikb-loading-dot"></span><span class="zikb-loading-dot"></span></div>';
   }
 
+  function clearResultsView() {
+    if (_resultsEl) {
+      _resultsEl.innerHTML = '';
+      _resultsEl.classList.remove('zikb-results-fading');
+    }
+    var body = _panel ? _panel.querySelector('#zikb-body') : null;
+    if (body) body.scrollTop = 0;
+  }
+
   function renderResults(query, isAutoCorrect) {
     var q = sanitizeQuery(query);
     if (!q) { renderWelcome(); return; }
+
+    clearResultsView();
+
     _lastQuery = q;
     if (!isAutoCorrect) addHistory(q);
 
@@ -2003,31 +2800,22 @@
     var allValid = searchResult.all;
     var spellSuggestions = searchResult.spellingSuggestions;
     var correctedQuery = searchResult.correctedQuery;
-    var starredProduct = searchResult.effectiveProduct || _product;
+    var queryDetected = searchResult.queryDetectedProduct;
+    var resultInferred = inferProductFromResults(allValid, 5);
+    var starredProduct = queryDetected || resultInferred || _product;
+    debugLog('PRODUCT-CONTEXT', { configuredProduct: _product, queryDetected: queryDetected, resultInferred: resultInferred, starredProduct: starredProduct });
 
     var topOrigNorm = allValid.length > 0 ? allValid[0].normalizedScore : 0;
-    if (correctedQuery && !isAutoCorrect && (allValid.length === 0 || topOrigNorm < MEDIUM_CONFIDENCE)) {
+    if (correctedQuery && !isAutoCorrect && allValid.length === 0) {
       var correctedResult = searchIndex(correctedQuery, _product);
       if (correctedResult.all.length > 0) {
-        if (allValid.length === 0) {
-          kbResults = correctedResult.kb;
-          communityResults = correctedResult.community;
-          allValid = correctedResult.all;
-        } else {
-          var existingIds = {};
-          allValid.forEach(function (r) { existingIds[r.article.id] = true; });
-          correctedResult.all.forEach(function (cr) {
-            if (!existingIds[cr.article.id]) {
-              allValid.push(cr);
-              if ((cr.article.type || 'kb').toLowerCase() === 'community') communityResults.push(cr);
-              else kbResults.push(cr);
-            }
-          });
-          allValid.sort(function (a, b) { return b.score - a.score; });
-          kbResults.sort(function (a, b) { return b.score - a.score; });
-          communityResults.sort(function (a, b) { return b.score - a.score; });
-        }
-        debugLog('AUTO-CORRECT', { original: q, corrected: correctedQuery, resultsFound: allValid.length });
+        kbResults = correctedResult.kb;
+        communityResults = correctedResult.community;
+        allValid = correctedResult.all;
+        var correctedDetected = correctedResult.queryDetectedProduct;
+        var correctedInferred = correctedDetected || inferProductFromResults(allValid, 5);
+        if (correctedInferred) starredProduct = correctedInferred;
+        debugLog('AUTO-CORRECT', { original: q, corrected: correctedQuery, resultsFound: allValid.length, inferredProduct: correctedInferred });
       }
     }
 
@@ -2042,13 +2830,24 @@
     });
 
     var topNormalized = allValid.length > 0 ? allValid[0].normalizedScore : 0;
+    var topExactSignal = allValid.length > 0 ? (allValid[0].exactSignal || 0) : 0;
+    var topHardBoostTier = allValid.length > 0 ? (allValid[0].hardBoostTier || 0) : 0;
     var confidence = topNormalized >= HIGH_CONFIDENCE ? 'high' : (topNormalized >= MEDIUM_CONFIDENCE ? 'medium' : 'low');
+    if ((topExactSignal > 0 || topHardBoostTier > 0) && confidence === 'low') confidence = 'medium';
 
     debugLog('CONFIDENCE', { topNormalized: topNormalized, confidence: confidence, thresholds: { high: HIGH_CONFIDENCE, medium: MEDIUM_CONFIDENCE } });
 
-    html += '<span class="zikb-intent-tag">' + esc(intent.label) + '</span>';
+    var totalResults = allValid.length;
+    html += '<div class="zikb-clear-results-bar">';
+    html += '<span class="zikb-clear-results-info">';
+    html += '<span class="zikb-intent-tag" style="margin:0">' + esc(intent.label) + '</span>';
+    html += '<span class="zikb-clear-results-query" title="' + esc(q) + '">\u201c' + esc(q) + '\u201d</span>';
+    html += '<span class="zikb-clear-results-count">' + totalResults + ' result' + (totalResults !== 1 ? 's' : '') + '</span>';
+    html += '</span>';
+    html += '<button class="zikb-clear-results-btn" data-action="clear-results">' + svgIcon('clear') + ' Clear</button>';
+    html += '</div>';
 
-    if (spellSuggestions && correctedQuery) {
+    if (spellSuggestions && correctedQuery && !((topExactSignal > 0 || topHardBoostTier > 0) && allValid.length > 0)) {
       html += '<div class="zikb-spell">' + svgIcon('search') + ' Did you mean: <span class="zikb-spell-link" data-suggest="' + esc(correctedQuery) + '">' + esc(correctedQuery) + '</span>';
       if (allValid.length > 0 && searchResult.all.length === 0) {
         html += ' <span class="zikb-spell-orig">(showing results for corrected query)</span>';
@@ -2056,8 +2855,12 @@
       html += '</div>';
     }
 
-    html += buildStarredSection(starredProduct, _config, true);
-
+    html += '<div class="zikb-view-tabs" role="tablist" aria-label="Search result sections">';
+    html += '<button class="zikb-view-tab active" type="button" role="tab" data-view-tab="all" aria-selected="true">All</button>';
+    html += '<button class="zikb-view-tab" type="button" role="tab" data-view-tab="kb" aria-selected="false">Knowledge Base</button>';
+    html += '<button class="zikb-view-tab" type="button" role="tab" data-view-tab="community" aria-selected="false">Community</button>';
+    html += '<button class="zikb-view-tab" type="button" role="tab" data-view-tab="resources" aria-selected="false">Quick Actions & Guides</button>';
+    html += '</div>';
     if (allValid.length === 0) {
       html += '<div class="zikb-no-match">';
       html += '<strong>No matching results found</strong>';
@@ -2069,51 +2872,7 @@
       }
       html += '</div>';
       trackZeroResult(q);
-    } else if (confidence === 'high') {
-      var highKbLimit = Math.min(kbResults.length, 3);
-      var highCommLimit = Math.min(communityResults.length, 3);
-
-      html += '<div class="zikb-section-label">' + svgIcon('book') + ' Knowledge Base (' + kbResults.length + ')</div>';
-      if (kbResults.length > 0) {
-        for (var i = 0; i < highKbLimit; i++) html += renderResultCard(kbResults[i], keywords, synonymList, 'kb', i);
-        if (kbResults.length > highKbLimit) {
-          html += '<div class="zikb-more-btn" data-action="show-more-kb">Show ' + (kbResults.length - highKbLimit) + ' more KB articles</div>';
-        }
-      } else {
-        html += '<div class="zikb-no-section-results">No KB articles matched this query.</div>';
-      }
-      html += '<div class="zikb-section-label">' + svgIcon('users') + ' Community (' + communityResults.length + ')</div>';
-      if (communityResults.length > 0) {
-        for (var j = 0; j < highCommLimit; j++) html += renderResultCard(communityResults[j], keywords, synonymList, 'community', 100 + j);
-        if (communityResults.length > highCommLimit) {
-          html += '<div class="zikb-more-btn" data-action="show-more-comm">Show ' + (communityResults.length - highCommLimit) + ' more threads</div>';
-        }
-      } else {
-        html += '<div class="zikb-no-section-results">No Community threads matched this query.</div>';
-      }
-    } else if (confidence === 'medium') {
-      var medKbLimit = Math.min(kbResults.length, MAX_RESULTS);
-      var medCommLimit = Math.min(communityResults.length, MAX_RESULTS);
-
-      html += '<div class="zikb-section-label">' + svgIcon('book') + ' Knowledge Base (' + kbResults.length + ')</div>';
-      if (kbResults.length > 0) {
-        for (var k = 0; k < medKbLimit; k++) html += renderResultCard(kbResults[k], keywords, synonymList, 'kb', k);
-        if (kbResults.length > medKbLimit) {
-          html += '<div class="zikb-more-btn" data-action="show-more-kb">Show ' + (kbResults.length - medKbLimit) + ' more KB articles</div>';
-        }
-      } else {
-        html += '<div class="zikb-no-section-results">No KB articles matched this query.</div>';
-      }
-      html += '<div class="zikb-section-label">' + svgIcon('users') + ' Community (' + communityResults.length + ')</div>';
-      if (communityResults.length > 0) {
-        for (var l = 0; l < medCommLimit; l++) html += renderResultCard(communityResults[l], keywords, synonymList, 'community', 100 + l);
-        if (communityResults.length > medCommLimit) {
-          html += '<div class="zikb-more-btn" data-action="show-more-comm">Show ' + (communityResults.length - medCommLimit) + ' more threads</div>';
-        }
-      } else {
-        html += '<div class="zikb-no-section-results">No Community threads matched this query.</div>';
-      }
-    } else {
+    } else if (confidence === 'low') {
       var suggestions2 = suggestRephrased(q, intent);
       html += '<div class="zikb-low-conf"><div class="zikb-low-conf-title">' + svgIcon('alert') + ' Low confidence matches</div>';
       if (suggestions2.length > 0) {
@@ -2121,17 +2880,69 @@
         suggestions2.forEach(function (s) { html += '<span class="zikb-suggest-btn" data-suggest="' + esc(s) + '">' + esc(s) + '</span>'; });
       }
       html += '</div>';
-      var lowLimit = Math.min(allValid.length, 5);
-      html += '<div class="zikb-section-label">Related results</div>';
-      for (var m = 0; m < lowLimit; m++) {
-        html += renderResultCard(allValid[m], keywords, synonymList, (allValid[m].article.type || '').toLowerCase() === 'community' ? 'community' : 'kb', 200 + m);
-      }
     }
+
+    var resultLimit = Math.max(MAX_RESULTS, kbResults.length, communityResults.length);
+    var kbLimit = Math.min(kbResults.length, resultLimit);
+    var commLimit = Math.min(communityResults.length, resultLimit);
+
+    html += '<section class="zikb-ia-section zikb-ia-kb zikb-tab-target zikb-tab-kb zikb-tab-all" role="region" aria-label="Knowledge Base Articles">';
+    html += '<button class="zikb-section-label zikb-accordion-label" type="button" role="heading" aria-level="3" data-accordion-target="kb-section" aria-expanded="true">' + svgIcon('book') + ' Knowledge Base Articles <span class="zikb-section-count">(' + kbResults.length + ')</span><span class="zikb-accordion-chevron">' + svgIcon('chevronUp') + '</span></button>';
+    html += '<div class="zikb-section-results zikb-accordion-body" id="kb-section" role="list" aria-label="Knowledge Base results"><div class="zikb-section-results-scroll">';
+    if (kbResults.length > 0) {
+      for (var i = 0; i < kbLimit; i++) html += renderResultCard(kbResults[i], keywords, synonymList, 'kb', i);
+      if (kbResults.length > kbLimit) {
+        html += '<div class="zikb-more-btn" data-action="show-more-kb" data-start-from="' + kbLimit + '" role="button" tabindex="0">Show ' + (kbResults.length - kbLimit) + ' more KB articles</div>';
+      }
+    } else {
+      html += '<div class="zikb-no-section-results">No KB articles matched this query.</div>';
+    }
+    html += '</div></div></section>';
+
+    html += '<section class="zikb-ia-section zikb-ia-community zikb-tab-target zikb-tab-community zikb-tab-all" role="region" aria-label="Community Posts, Replies, and Topics">';
+    html += '<button class="zikb-section-label zikb-accordion-label" type="button" role="heading" aria-level="3" data-accordion-target="comm-section" aria-expanded="true">' + svgIcon('users') + ' Community Posts / Replies / Topics <span class="zikb-section-count">(' + communityResults.length + ')</span><span class="zikb-accordion-chevron">' + svgIcon('chevronUp') + '</span></button>';
+    html += '<div class="zikb-section-results zikb-accordion-body" id="comm-section" role="list" aria-label="Community results"><div class="zikb-section-results-scroll">';
+    if (communityResults.length > 0) {
+      for (var j = 0; j < commLimit; j++) html += renderResultCard(communityResults[j], keywords, synonymList, 'community', 100 + j);
+      if (communityResults.length > commLimit) {
+        html += '<div class="zikb-more-btn" data-action="show-more-comm" data-start-from="' + commLimit + '" role="button" tabindex="0">Show ' + (communityResults.length - commLimit) + ' more threads</div>';
+      }
+    } else {
+      html += '<div class="zikb-no-section-results">No Community threads matched this query.</div>';
+    }
+    html += '</div></div></section>';
+
+    // Cross-reference: show related community threads under KB results and vice versa
+    if (kbResults.length > 0 && communityResults.length > 0) {
+      html += '<section class="zikb-ia-section zikb-ia-crossref zikb-tab-target zikb-tab-all" role="region" aria-label="Related Cross-References">';
+      html += '<button class="zikb-section-label zikb-accordion-label" type="button" role="heading" aria-level="3" data-accordion-target="crossref-section" aria-expanded="false">' + svgIcon('link') + ' Related: Documentation \u2194 Community <span class="zikb-section-count">(' + Math.min(kbResults.length, 3) + ' + ' + Math.min(communityResults.length, 3) + ')</span><span class="zikb-accordion-chevron">' + svgIcon('chevronUp') + '</span></button>';
+      html += '<div class="zikb-section-results zikb-accordion-body zikb-collapsed" id="crossref-section">';
+      html += '<div style="padding:8px 12px;font-size:.78rem;color:#666;border-bottom:1px solid #eee">Showing related product documentation alongside community discussions for a consolidated view.</div>';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px">';
+      html += '<div><div style="font-size:.72rem;font-weight:600;color:#1f4f93;margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em">' + svgIcon('book') + ' KB Docs</div>';
+      for (var cr1 = 0; cr1 < Math.min(kbResults.length, 3); cr1++) {
+        var crKb = kbResults[cr1].article;
+        html += '<a href="' + esc(crKb.url) + '" target="_blank" rel="noopener" style="display:block;font-size:.76rem;color:#1f4f93;text-decoration:none;padding:3px 0;border-bottom:1px dotted #e8e8e8" title="' + esc(crKb.title) + '">' + esc(crKb.title.length > 55 ? crKb.title.substring(0, 52) + '\u2026' : crKb.title) + '</a>';
+      }
+      html += '</div>';
+      html += '<div><div style="font-size:.72rem;font-weight:600;color:#5b6e3e;margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em">' + svgIcon('users') + ' Community</div>';
+      for (var cr2 = 0; cr2 < Math.min(communityResults.length, 3); cr2++) {
+        var crComm = communityResults[cr2].article;
+        html += '<a href="' + esc(crComm.url) + '" target="_blank" rel="noopener" style="display:block;font-size:.76rem;color:#5b6e3e;text-decoration:none;padding:3px 0;border-bottom:1px dotted #e8e8e8" title="' + esc(crComm.title) + '">' + esc(crComm.title.length > 55 ? crComm.title.substring(0, 52) + '\u2026' : crComm.title) + (crComm.solved ? ' \u2713' : '') + '</a>';
+      }
+      html += '</div></div></div></section>';
+    }
+
+    html += buildQuickActionsSection(starredProduct, _config, { compact: false, collapsedByDefault: true, idPrefix: 'sr-top', query: q });
+    html += buildQuickGuidesSection(starredProduct, _config, q, { compact: false, collapsedByDefault: true, idPrefix: 'sr-top' });
+
+    html += renderRecentSearchesSection(5, { idPrefix: 'sr', collapsedByDefault: true });
 
     debugLog('RENDERED-URLS', allValid.slice(0, MAX_RESULTS).map(function (r) {
       return { id: r.article.id, url: r.article.url, normalized: r.normalizedScore };
     }));
 
+    _resultsEl.classList.remove('zikb-results-fading');
     _resultsEl.innerHTML = html;
     bindResultActions(q);
     reportAnalytics(q, intent);
@@ -2140,18 +2951,24 @@
   function renderWelcome() {
     var p = getProductConfig(_product, _config);
     var html = '';
-    var history = getHistory();
-    if (history.length > 0) {
-      html += '<div class="zikb-section-label">Recent searches</div>';
-      history.slice(0, 5).forEach(function (h) { html += '<span class="zikb-suggest-btn" data-suggest="' + esc(h.q) + '">' + esc(h.q) + '</span>'; });
+    if (_resultsEl) _resultsEl.classList.remove('zikb-results-fading');
+    var body = _panel ? _panel.querySelector('#zikb-body') : null;
+    if (body) body.scrollTop = 0;
+    var recentSectionHtml = renderRecentSearchesSection(5, { idPrefix: 'welcome', collapsedByDefault: true });
+    if (recentSectionHtml) {
+      html += recentSectionHtml;
       html += '<hr class="zikb-divider">';
     }
 
     var defaultQueries = ['How to publish a course', 'SCORM package error', 'Getting started with ' + esc(p.label)];
-    html += '<div class="zikb-section-label">' + svgIcon('search') + ' Suggested Queries</div>';
+    html += '<section class="zikb-ia-section zikb-ia-suggested" role="region" aria-label="Suggested Queries">';
+    html += '<button class="zikb-section-label zikb-accordion-label" type="button" data-accordion-target="welcome-suggested-body" aria-expanded="false">' + svgIcon('search') + ' Suggested Queries <span class="zikb-accordion-chevron">' + svgIcon('chevronUp') + '</span></button>';
+    html += '<div class="zikb-accordion-body zikb-collapsed" id="welcome-suggested-body">';
+    html += '<div class="zikb-suggest-list">';
     defaultQueries.forEach(function (dq) {
       html += '<span class="zikb-suggest-btn" data-suggest="' + esc(dq) + '">' + esc(dq) + '</span>';
     });
+    html += '</div></div></section>';
 
     if (!_indexLoaded) {
       if (_indexLoadError) {
@@ -2172,25 +2989,52 @@
       }
     }
 
-    html += buildStarredSection(_product, _config);
+    html += buildQuickActionsSection(_product, _config, { compact: false, collapsedByDefault: true, idPrefix: 'welcome', query: '' });
+    html += buildQuickGuidesSection(_product, _config, '', { compact: false, collapsedByDefault: true, idPrefix: 'welcome' });
 
     _resultsEl.innerHTML = html;
     bindResultActions('');
   }
 
   function bindResultActions(currentQuery) {
+    _resultsEl.querySelectorAll('[data-action="clear-results"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        _input.value = '';
+        if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
+        _lastQuery = '';
+        clearResultsView();
+        renderWelcome();
+        _input.focus();
+      });
+    });
+
     _resultsEl.querySelectorAll('[data-suggest]').forEach(function (btn) {
       btn.addEventListener('click', function () { _input.value = btn.getAttribute('data-suggest'); doSearch(); });
     });
 
-    _resultsEl.querySelectorAll('[data-action="expand-starred"]').forEach(function (toggle) {
-      toggle.addEventListener('click', function () {
-        var wrap = toggle.closest('.zikb-starred-wrap');
-        if (wrap) {
-          var isExpanded = wrap.classList.contains('zikb-starred-expanded');
-          wrap.classList.toggle('zikb-starred-expanded');
-          toggle.innerHTML = isExpanded ? svgIcon('chevronDown') : svgIcon('chevronUp');
-        }
+    _resultsEl.querySelectorAll('[data-view-tab]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var tab = btn.getAttribute('data-view-tab') || 'all';
+        _resultsEl.querySelectorAll('[data-view-tab]').forEach(function (b) {
+          var active = b === btn;
+          b.classList.toggle('active', active);
+          b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        _resultsEl.querySelectorAll('.zikb-tab-target').forEach(function (el) {
+          var shouldShow = tab === 'all' || el.classList.contains('zikb-tab-' + tab);
+          el.classList.toggle('zikb-hidden', !shouldShow);
+        });
+      });
+    });
+
+    _resultsEl.querySelectorAll('[data-accordion-target]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var targetId = btn.getAttribute('data-accordion-target');
+        var body = targetId ? document.getElementById(targetId) : null;
+        if (!body) return;
+        var isExpanded = btn.getAttribute('aria-expanded') !== 'false';
+        btn.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+        body.classList.toggle('zikb-collapsed', isExpanded);
       });
     });
 
@@ -2209,6 +3053,12 @@
       link.addEventListener('click', function () {
         var aid = link.getAttribute('data-article-id');
         if (aid && currentQuery) trackClick(aid, currentQuery);
+      });
+    });
+
+    _resultsEl.querySelectorAll('[data-guide-key]').forEach(function (link) {
+      link.addEventListener('click', function () {
+        trackQuickGuideUsage(link.getAttribute('data-guide-key'));
       });
     });
 
@@ -2236,9 +3086,7 @@
           keywords.forEach(function (kw) {
             getSynonyms(kw).forEach(function (s) { if (synonymList.indexOf(s) === -1) synonymList.push(s); });
           });
-          var currentShown = _resultsEl.querySelectorAll('[data-action="' + selector + '"]')[0];
-          var alreadyShown = currentShown ? currentShown.previousElementSibling : null;
-          var showFrom = MAX_RESULTS;
+          var showFrom = parseInt(moreBtn.getAttribute('data-start-from') || String(MAX_RESULTS), 10);
           var extra = '';
           for (var i = showFrom; i < filtered.length; i++) {
             extra += renderResultCard(filtered[i], keywords, synonymList, (filtered[i].article.type || '').toLowerCase() === 'community' ? 'community' : 'kb', startIdx + i);
@@ -2254,7 +3102,13 @@
     bindMoreBtn('show-more-comm', function (sr) { return sr.community; }, 500);
   }
 
-  function doSearch() { var q = sanitizeQuery(_input.value); _input.value = q; renderResults(q); }
+  function doSearch() {
+    if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
+    var q = sanitizeQuery(_input.value);
+    _input.value = q;
+    if (_resultsEl) _resultsEl.classList.remove('zikb-results-fading');
+    renderResults(q);
+  }
 
   function debouncedSearch() {
     if (_debounceTimer) clearTimeout(_debounceTimer);
@@ -2311,48 +3165,76 @@
       if (!_panel) {
         _toggle = document.createElement('button');
         _toggle.id = 'zikb-toggle'; _toggle.type = 'button';
-        _toggle.setAttribute('aria-label', 'Open help assistant'); _toggle.setAttribute('title', 'Help');
+        _toggle.setAttribute('aria-label', 'Open ELB Assistant');
+        _toggle.setAttribute('data-tooltip', 'ELB Assistant');
         _toggle.innerHTML = svgIcon('chat');
         _panel = document.createElement('div');
         _panel.id = 'zikb-panel'; _panel.setAttribute('role', 'dialog');
-        _panel.setAttribute('aria-label', 'Knowledge Base & Community Help'); _panel.setAttribute('aria-modal', 'false');
+        _panel.setAttribute('aria-label', 'ELB Assistant — Knowledge Base & Community Help');
+        _panel.setAttribute('aria-modal', 'false');
         document.body.appendChild(_toggle); document.body.appendChild(_panel);
         _panel.addEventListener('click', function (e) { e.stopPropagation(); });
         setupDrag(); setupOutsideClick();
       }
 
       _panel.innerHTML =
-        '<div id="zikb-header"><span class="zikb-grip">' + svgIcon('grip') + '</span><span>How can we help?</span><div style="display:flex;align-items:center;gap:.25rem">' +
-        '<button id="zikb-reload-btn" type="button" aria-label="Reload chatbot" title="Reload chatbot (re-fetch index &amp; reset)">' + svgIcon('reload') + '</button>' +
-        '<button id="zikb-close" type="button" aria-label="Close" title="Close">\u00d7</button></div></div>' +
-        '<div id="zikb-body"><div id="zikb-msg">' + esc(p.welcomeMessage) + '</div>' +
-        '<div id="zikb-search-wrap"><input id="zikb-search-input" type="search" placeholder="Describe your question\u2026" autocomplete="off" aria-label="Search">' +
-        '<button id="zikb-clear-btn" type="button" aria-label="Clear search" title="Clear search" style="display:none">' + svgIcon('clear') + '</button>' +
-        '<button id="zikb-search-btn" type="button">Find</button></div>' +
-        '<div id="zikb-status" aria-live="polite"></div>' +
-        '<div id="zikb-results" role="list" aria-live="polite"></div></div>' +
-        '<div class="zikb-powered">ELB Help Bot v' + VERSION + ' <span class="zikb-kbd-hint">Ctrl+Shift+H</span></div>';
+        '<a class="zikb-skip-link" href="#zikb-search-input">Skip to search</a>' +
+        '<header id="zikb-header" role="banner"><span class="zikb-grip" aria-hidden="true">' + svgIcon('grip') + '</span>' +
+        '<span class="zikb-header-title">' + svgIcon('book') + ' ELB Assistant</span>' +
+        '<div class="zikb-header-actions">' +
+        '<button id="zikb-reload-btn" class="zikb-header-btn" type="button" aria-label="Reload assistant" data-tooltip="Reload">' + svgIcon('reload') + '</button>' +
+        '<button id="zikb-minimize-btn" class="zikb-header-btn" type="button" aria-label="Minimize" data-tooltip="Minimize">' + svgIcon('minimize') + '</button>' +
+        '<button id="zikb-maximize-btn" class="zikb-header-btn" type="button" aria-label="Maximize" data-tooltip="Maximize">' + svgIcon('maximize') + '</button>' +
+        '<button id="zikb-close" class="zikb-header-btn" type="button" aria-label="Close assistant" data-tooltip="Close">' + svgIcon('clear') + '</button>' +
+        '</div></header>' +
+        '<main id="zikb-body" role="main"><div id="zikb-msg">' + esc(p.welcomeMessage) + '</div>' +
+        '<div id="zikb-search-wrap" role="search" aria-label="Search knowledge base">' +
+        '<input id="zikb-search-input" type="text" placeholder="Search knowledge base\u2026" autocomplete="off" aria-label="Search knowledge base and community" role="searchbox">' +
+        '<button id="zikb-search-btn" type="button" aria-label="Search" data-tooltip="Search">' + svgIcon('search') + '</button></div>' +
+        '<div id="zikb-status" aria-live="polite" role="status"></div>' +
+        '<div id="zikb-results" role="region" aria-live="polite" aria-label="Search results"></div></main>' +
+        '<footer class="zikb-powered" role="contentinfo">ELB Assistant v' + VERSION + ' <span class="zikb-kbd-hint">Ctrl+Shift+H</span></footer>';
 
       _input = _panel.querySelector('#zikb-search-input');
       _resultsEl = _panel.querySelector('#zikb-results');
-      var _clearBtn = _panel.querySelector('#zikb-clear-btn');
 
       _panel.querySelector('#zikb-search-btn').addEventListener('click', doSearch);
       _input.addEventListener('keydown', function (e) { if (e.key === 'Enter') doSearch(); });
       _input.addEventListener('input', function () {
-        _clearBtn.style.display = _input.value.trim().length > 0 ? 'flex' : 'none';
-      });
-      _clearBtn.addEventListener('click', function () {
-        _input.value = '';
-        _clearBtn.style.display = 'none';
-        _lastQuery = '';
-        renderWelcome();
-        _input.focus();
+        var hasText = _input.value.trim().length > 0;
+
+        if (!hasText && _lastQuery) {
+          _lastQuery = '';
+          if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
+          clearResultsView();
+          renderWelcome();
+        } else if (hasText && _lastQuery && _input.value.trim() !== _lastQuery) {
+          _lastQuery = '';
+          if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
+          clearResultsView();
+          _resultsEl.innerHTML = '<div class="zikb-typing-hint">' + svgIcon('search') + ' Press <kbd>Enter</kbd> or click ' + svgIcon('enter') + ' to search</div>';
+        }
       });
       _panel.querySelector('#zikb-close').addEventListener('click', function () {
-        _panel.classList.remove('open');
+        _panel.classList.remove('open', 'zikb-minimized', 'zikb-maximized');
         persistPanelState(false);
         _toggle.focus();
+      });
+      _panel.querySelector('#zikb-minimize-btn').addEventListener('click', function () {
+        var isMinimized = _panel.classList.toggle('zikb-minimized');
+        _panel.classList.remove('zikb-maximized');
+        var minBtn = _panel.querySelector('#zikb-minimize-btn');
+        minBtn.innerHTML = isMinimized ? svgIcon('restore') : svgIcon('minimize');
+        minBtn.setAttribute('aria-label', isMinimized ? 'Restore' : 'Minimize');
+        minBtn.setAttribute('data-tooltip', isMinimized ? 'Restore' : 'Minimize');
+      });
+      _panel.querySelector('#zikb-maximize-btn').addEventListener('click', function () {
+        _panel.classList.remove('zikb-minimized');
+        var isMaximized = _panel.classList.toggle('zikb-maximized');
+        var maxBtn = _panel.querySelector('#zikb-maximize-btn');
+        maxBtn.innerHTML = isMaximized ? svgIcon('restore') : svgIcon('maximize');
+        maxBtn.setAttribute('aria-label', isMaximized ? 'Restore size' : 'Maximize');
+        maxBtn.setAttribute('data-tooltip', isMaximized ? 'Restore' : 'Maximize');
       });
       _panel.querySelector('#zikb-reload-btn').addEventListener('click', function () { reloadChatbot(); });
       setupPanelDrag();
@@ -2445,10 +3327,11 @@
   function setupDrag() {
     var isDrag = false, sx = 0, sy = 0, tx = 0, ty = 0;
     function pos(x, y) {
-      _toggle.style.cssText = 'position:fixed;left:' + x + 'px;top:' + y + 'px;right:auto;bottom:auto;width:56px;height:56px;border-radius:50%;background:' + ((_config && _config.theme && _config.theme.buttonColor) || '#e85d04') + ';border:none;color:#fff;cursor:move;box-shadow:0 4px 16px rgba(0,0,0,.2);z-index:2147483646;display:flex;align-items:center;justify-content:center;user-select:none';
+      var color = ((_config && _config.theme && _config.theme.buttonColor) || '#e85d04');
+      _toggle.style.cssText = 'position:fixed;left:' + x + 'px;top:' + y + 'px;right:auto;bottom:auto;width:76px;height:76px;border-radius:50%;background:linear-gradient(145deg,#ff7b2e 0%,#f06410 25%,' + color + ' 50%,#d14800 80%,#b83d00 100%);border:3px solid rgba(255,255,255,.9);color:#fff;cursor:move;box-shadow:0 12px 32px rgba(232,93,4,.42),0 6px 18px rgba(0,0,0,.14),inset 0 2px 4px rgba(255,255,255,.3);z-index:2147483646;display:flex;align-items:center;justify-content:center;user-select:none';
       var panelPos = getPanelSavedPos();
       if (!panelPos) {
-        _panel.style.left = Math.min(x, window.innerWidth - 460) + 'px';
+        _panel.style.left = Math.min(x, window.innerWidth - 444) + 'px';
         _panel.style.right = 'auto'; _panel.style.bottom = (window.innerHeight - y + 12) + 'px'; _panel.style.top = 'auto';
       }
     }
@@ -2458,7 +3341,7 @@
     function move(cx, cy) {
       var dx = cx - sx, dy = cy - sy;
       if (!isDrag && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) isDrag = true;
-      if (isDrag) pos(Math.max(0, Math.min(window.innerWidth - 56, tx + dx)), Math.max(0, Math.min(window.innerHeight - 56, ty + dy)));
+      if (isDrag) pos(Math.max(0, Math.min(window.innerWidth - 76, tx + dx)), Math.max(0, Math.min(window.innerHeight - 76, ty + dy)));
     }
     function end() {
       _toggle.classList.remove('dragging');
@@ -2602,10 +3485,11 @@
     var reloadBtn = _panel ? _panel.querySelector('#zikb-reload-btn') : null;
     if (reloadBtn) reloadBtn.classList.add('zikb-spinning');
 
+    if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
     if (_input) { _input.value = ''; }
-    var _clearBtn = _panel ? _panel.querySelector('#zikb-clear-btn') : null;
-    if (_clearBtn) { _clearBtn.style.display = 'none'; }
     _lastQuery = '';
+
+    clearResultsView();
 
     _contentIndex = null;
     _indexLoaded = false;

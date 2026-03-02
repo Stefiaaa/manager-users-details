@@ -1,5 +1,5 @@
 /**
- * ELB Help Bot — Config File (HTML / JavaScript) v3.16.0
+ * ELB Assistant — Config File (HTML / JavaScript) v4.4.0
  *
  * HOW TO USE THIS FILE:
  * 1. Copy this file along with elb-help-bot.js to your website folder.
@@ -7,7 +7,7 @@
  * 3. Add this line before </body> in your HTML page:
  *      <script src="elb-help-bot-config.js"></script>
  *
- * That's it — the chatbot will appear on your page.
+ * That's it — the ELB Assistant will appear on your page.
  *
  * The content index (article database) is already built into elb-help-bot.js.
  * No additional index file is needed unless you want to use your own custom articles.
@@ -18,7 +18,7 @@
   // ==================== EDIT THESE VALUES ====================
 
   var product   = 'general';           // Your product slug (see INSTRUCTIONS.md for the full list)
-  var scriptUrl = '/scripts/elb-help-bot.js';   // Path to elb-help-bot.js (relative path works for both local and deployed)
+  var scriptUrl = '/scripts/elb-help-bot.js';   // Path to elb-help-bot.js (change if it is in a different folder)
 
   // ============================================================
 
