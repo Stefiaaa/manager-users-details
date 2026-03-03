@@ -1,5 +1,5 @@
 /**
- * ELB Assistant — Config File v4.9.0
+ * ELB Assistant — Config File v4.10.0
  *
  * HOW TO USE:
  * 1. Copy this file + elb-help-bot.js to your website folder.
@@ -29,7 +29,7 @@
 
   // ==================================================
 
-  var version = '4.9.0';
+  var version = '4.10.0';
   window.productContext = { product: product };
   if (configUrl)    window.elbHelpBotConfigUrl = configUrl;
   if (indexUrl)     window.elbHelpBotIndexUrl = indexUrl;
