@@ -1,38 +1,35 @@
 /**
- * ELB Assistant — Config File (HTML / JavaScript) v4.4.0
+ * ELB Assistant — Config File v4.9.0
  *
- * HOW TO USE THIS FILE:
- * 1. Copy this file along with elb-help-bot.js to your website folder.
- * 2. Edit ONLY the two values in the "EDIT THESE VALUES" section below.
- * 3. Add this line before </body> in your HTML page:
- *      <script src="elb-help-bot-config.js"></script>
+ * HOW TO USE:
+ * 1. Copy this file + elb-help-bot.js to your website folder.
+ * 2. Set your product slug below (line 18).
+ * 3. Add before </body>:  <script src="elb-help-bot-config.js"></script>
  *
- * That's it — the ELB Assistant will appear on your page.
- *
- * The content index (article database) is already built into elb-help-bot.js.
- * No additional index file is needed unless you want to use your own custom articles.
+ * Product slugs:  lectora | cenariovr | training-arcade | microbuilder
+ *                 rockstar | rehearsal | coursemill | reviewlink
+ *                 learning-creation-studio | general
  */
 (function() {
   'use strict';
 
   // ==================== EDIT THESE VALUES ====================
 
-  var product   = 'general';           // Your product slug (see INSTRUCTIONS.md for the full list)
-  var scriptUrl = '/scripts/elb-help-bot.js';   // Path to elb-help-bot.js (change if it is in a different folder)
+  var product   = 'general';           // Your product slug (see list above)
+  var scriptUrl = '/scripts/elb-help-bot.js';   // Path to elb-help-bot.js
 
   // ============================================================
 
+  // ==================== OPTIONAL ====================
 
-  // ==================== OPTIONAL — change only if needed ====================
+  var indexUrl     = '';    // Custom content-index.json path (leave empty for built-in)
+  var configUrl    = '';    // Theme/product overrides JSON URL
+  var analyticsUrl = '';    // POST endpoint for query analytics
+  var debugMode    = false; // true = show debug logs in Console
 
-  var indexUrl     = '';    // Path or URL to your custom content-index.json (leave empty to use the built-in index)
-  var configUrl    = '';    // URL to a theme/product overrides JSON file (rarely needed)
-  var analyticsUrl = '';    // POST endpoint URL for query analytics (rarely needed)
-  var debugMode    = false; // Set to true to enable troubleshooting logs in the browser Console
+  // ==================================================
 
-  // =========================================================================
-
-
+  var version = '4.9.0';
   window.productContext = { product: product };
   if (configUrl)    window.elbHelpBotConfigUrl = configUrl;
   if (indexUrl)     window.elbHelpBotIndexUrl = indexUrl;
@@ -40,7 +37,7 @@
   if (debugMode)    window.elbHelpBotDebug = true;
 
   var s = document.createElement('script');
-  s.src = scriptUrl;
+  s.src = scriptUrl + '?v=' + version;
   s.async = false;
   (document.body || document.documentElement).appendChild(s);
 })();
