@@ -1,6 +1,62 @@
 /**
- * ELB Assistant â€” Precision Retrieval Engine v4.10.0
+ * ELB Assistant â€” Precision Retrieval Engine v4.17.0
  * In-product knowledge assistant: KB + Community + Product support.
+ *
+ * v4.17.0 - UI/UX Consistency, Min/Max Stability & Folder Cleanup:
+ *   - Maximize icon: standard single rectangle (Chrome/Safari pattern, no split-pane)
+ *   - Restore icon: overlapping-rectangles with clearer offset geometry
+ *   - Smooth maximize: animates from current position to centered viewport
+ *   - Smooth restore: returns to exact pre-max position with transition
+ *   - Drag suppresses transitions (zikb-panel-dragging transition:none)
+ *   - Resize handler re-centers maximized panel when viewport changes
+ *   - requestAnimationFrame on restore clamp prevents layout thrash
+ *   - Placement consistency: all 4 corners + custom positions verified identical
+ *   - Integration: duplicate root files removed; mandatory/ and optional/ are single source
+ *
+ * v4.16.0 - System-Wide UI/UX Consistency & Min/Max Stability:
+ *   - Minimize/Maximize: standard Chrome/Safari toggle patterns with stable icon states
+ *   - Smooth transitions: no flicker, position shift, clipping, or hidden states
+ *   - Original panel position preserved with stable restore after maximize
+ *   - Placement consistency: all 4 corners + custom positions render identically
+ *   - Maximize enters centered viewport mode; restore returns exact pre-max position
+ *   - Icon state machine: minimize=dash, restore-from-min=chevronUp, max=rect, restore=overlapping-rects
+ *   - Footer label: "Knowledge Assistant Engine v{VERSION}" - non-repetitive, distinct from header
+ *   - Search placeholder: "Search KB & Community..." - concise, no truncation at any width
+ *   - Integration docs: clear mandatory vs optional file separation
+ *
+ * v4.13.0 - Scroll Stability, Modern Chat Icon & System-Wide Polish:
+ *   - Scrollbar thumb now starts transparent across all scrollable areas, appears only
+ *     on hover/scroll — eliminates initial flicker and prevents phantom scrollbar flash
+ *   - Active-scroll CSS class (.zikb-scrolling) applied via JS scroll listener with 1s
+ *     auto-hide timeout for smooth reveal/fade behavior on dynamic content
+ *   - Firefox scrollbar-color transitions from transparent→orange on hover/scroll
+ *   - Extra bottom whitespace eliminated: tightened body padding, last-child margin reset
+ *   - Consistent scrollTop=0 reset after every search, clear, and welcome render
+ *   - Chatbot toggle icon replaced with modern chat-bubble-with-lines SVG — clean,
+ *     universally recognizable, position-agnostic across all four corner placements
+ *   - Admin chat-body scrollbar refined with thin styled scrollbar and hover reveal
+ *
+ * v4.12.1 - Hyperlink Hover Fix, Scrollbar Visibility, Generic Help Icon:
+ *   - Collapsed accordion bodies now use pointer-events:none and visibility:hidden,
+ *     preventing hidden links from showing URLs in the browser status bar on hover
+ *   - Result card <a> wrapper replaced with <div> container; only title is a link,
+ *     preventing phantom URL display when hovering card padding/empty space
+ *   - Added JS click handler on result-content for navigating from non-link card areas
+ *   - Scrollbar thumb now always visible (subtle orange tint) across all scrollable areas:
+ *     #zikb-body, .zikb-compact-resource-row, .zikb-expand, .zikb-resource-masonry
+ *   - Scrollbar intensifies on hover for better discoverability
+ *   - Chatbot toggle icon changed from chat bubble to universal question-mark help icon
+ *   - Toggle tooltip updated to generic "Need help?" label for placement flexibility
+ *
+ * v4.11.0 - UI/UX Fixes: Layout, Scrollbar, Tooltips, Placement, Icon States:
+ *   - Removed white-space gap above footer status bar (margin-top:auto on .zikb-powered)
+ *   - Scrollbar auto-hides: visible only on hover when content overflows
+ *   - Tooltips fully visible: header tooltips render below, toggle tooltip above, no clipping
+ *   - Welcome message updated to product-agnostic text
+ *   - Hidden/inactive links eliminated: empty sections and empty-href links hidden via CSS
+ *   - Minimize/maximize icon states fully consistent across all toggle interactions
+ *   - Configurable placement: top-left, top-right, bottom-left, bottom-right via theme.position
+ *   - Responsive media queries updated for all four corner positions
  *
  * v4.10.0 - Unified Ranking, Community URL Validation & Broken Link Prevention:
  *   - Unified "All" tab: KB + Community results interleaved by strict descending match%
@@ -368,12 +424,12 @@
  *     transposition, QWERTY keyboard proximity, double-letter patterns.
  *
  * Zero dependencies. Single vanilla JS file. Any tech stack.
- * @version 4.3.0
+ * @version 4.16.0
  */
 (function () {
   'use strict';
 
-  var VERSION = '4.10.0';
+  var VERSION = '4.17.0';
   var MAX_QUERY_LENGTH = 200;
   var MAX_RESULTS = 10;
   var HIGH_CONFIDENCE = 0.80;
@@ -2475,7 +2531,7 @@
     return {
       label: base ? base.label : product, kb: base ? base.kb : '/general-topics',
       community: base ? base.community : 'additional-learning-products',
-      welcomeMessage: overrides.welcomeMessage || "What can we help you find? Ask anything \u2014 we\u2019ll point you to the right resources."
+      welcomeMessage: overrides.welcomeMessage || "Search across the Knowledge Base and Community to find product guides, troubleshooting steps, and discussions."
     };
   }
 
@@ -2614,7 +2670,7 @@
     var targetId = idPrefix + '-recent-searches-body';
     var isCollapsed = !!options.collapsedByDefault;
     var html = '<section class="zikb-ia-section zikb-ia-recent zikb-tab-target zikb-tab-resources zikb-tab-all" role="region" aria-label="Recent Searches">';
-    html += '<button class="zikb-section-label zikb-accordion-label" type="button" data-accordion-target="' + targetId + '" aria-expanded="' + (!isCollapsed) + '">' + svgIcon('search') + ' Recent Searches <span class="zikb-section-count">(' + history.length + ')</span><span class="zikb-accordion-chevron">' + svgIcon('chevronUp') + '</span></button>';
+    html += '<button class="zikb-section-label zikb-accordion-label" type="button" data-accordion-target="' + targetId + '" aria-expanded="' + (!isCollapsed) + '">' + svgIcon('clock') + ' Recent Searches <span class="zikb-section-count">(' + history.length + ')</span><span class="zikb-accordion-chevron">' + svgIcon('chevronUp') + '</span></button>';
     html += '<div class="zikb-accordion-body ' + (isCollapsed ? 'zikb-collapsed' : '') + '" id="' + targetId + '">';
     html += '<div class="zikb-recent-list">';
     history.slice(0, maxItems).forEach(function (h) {
@@ -2652,39 +2708,68 @@
 
   /* =================== STYLES =================== */
 
+  function resolvePosition(pos) {
+    if (pos && typeof pos === 'object') {
+      var custom = { isLeft: false, isTop: false, hProp: 'right', vProp: 'bottom', hVal: 28, vVal: 28, custom: true };
+      if (pos.left !== undefined)   { custom.hProp = 'left';   custom.hVal = parseInt(pos.left, 10) || 28; custom.isLeft = true; }
+      if (pos.right !== undefined)  { custom.hProp = 'right';  custom.hVal = parseInt(pos.right, 10) || 28; custom.isLeft = false; }
+      if (pos.top !== undefined)    { custom.vProp = 'top';    custom.vVal = parseInt(pos.top, 10) || 28; custom.isTop = true; }
+      if (pos.bottom !== undefined) { custom.vProp = 'bottom'; custom.vVal = parseInt(pos.bottom, 10) || 28; custom.isTop = false; }
+      return custom;
+    }
+    var p = (pos || 'bottom-right').toLowerCase().trim();
+    var offsets = { h: 28, v: 28 };
+    var result = { isLeft: false, isTop: false, hProp: 'right', vProp: 'bottom', hVal: offsets.h, vVal: offsets.v, custom: false };
+    if (p === 'bottom-left')      { result.isLeft = true;  result.isTop = false; result.hProp = 'left';  result.vProp = 'bottom'; }
+    else if (p === 'top-left')    { result.isLeft = true;  result.isTop = true;  result.hProp = 'left';  result.vProp = 'top'; }
+    else if (p === 'top-right')   { result.isLeft = false; result.isTop = true;  result.hProp = 'right'; result.vProp = 'top'; }
+    else                          { result.isLeft = false; result.isTop = false; result.hProp = 'right'; result.vProp = 'bottom'; }
+    return result;
+  }
+
   function injectStyles(config) {
     if (document.getElementById('zikb-styles-v21')) return;
     var theme = (config && config.theme) || {};
     var btnColor = theme.buttonColor || '#e85d04';
     var headerColor = theme.headerColor || '#e85d04';
     var pos = theme.position || 'bottom-right';
-    var isLeft = pos === 'bottom-left';
+    var rp = resolvePosition(pos);
+    var isLeft = rp.isLeft;
+    var isTop = rp.isTop;
+    var toggleVVal = rp.custom ? rp.vVal : 28;
+    var toggleHVal = rp.custom ? rp.hVal : 28;
+    var togglePos = rp.vProp + ':' + toggleVVal + 'px;' + rp.hProp + ':' + toggleHVal + 'px';
+    var panelVOffset = toggleVVal + 92;
+    var panelHOffset = Math.max(toggleHVal - 4, 16);
+    var panelVPos = isTop ? 'top:' + panelVOffset + 'px' : 'bottom:' + panelVOffset + 'px';
+    var panelHPos = isLeft ? 'left:' + panelHOffset + 'px' : 'right:' + panelHOffset + 'px';
     var s = document.createElement('style');
     s.id = 'zikb-styles-v21';
     s.textContent = [
-      '#zikb-toggle{position:fixed;bottom:28px;' + (isLeft ? 'left:28px' : 'right:28px') + ';width:76px;height:76px;border-radius:50%;background:linear-gradient(145deg,#ff7b2e 0%,#f06410 25%,#e85d04 50%,#d14800 80%,#b83d00 100%);border:3px solid rgba(255,255,255,.9);color:#fff;cursor:move;box-shadow:0 12px 32px rgba(232,93,4,.42),0 6px 18px rgba(0,0,0,.14),inset 0 2px 4px rgba(255,255,255,.3);z-index:2147483646;transition:transform .25s cubic-bezier(.4,0,.2,1),box-shadow .25s cubic-bezier(.4,0,.2,1);user-select:none;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}',
+      '#zikb-toggle{position:fixed;' + togglePos + ';width:76px;height:76px;border-radius:50%;background:linear-gradient(145deg,#ff7b2e 0%,#f06410 25%,#e85d04 50%,#d14800 80%,#b83d00 100%);border:3px solid rgba(255,255,255,.9);color:#fff;cursor:move;box-shadow:0 12px 32px rgba(232,93,4,.42),0 6px 18px rgba(0,0,0,.14),inset 0 2px 4px rgba(255,255,255,.3);z-index:2147483646;transition:transform .25s cubic-bezier(.4,0,.2,1),box-shadow .25s cubic-bezier(.4,0,.2,1);user-select:none;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}',
       '#zikb-toggle:hover{transform:translateY(-3px) scale(1.1);box-shadow:0 16px 40px rgba(232,93,4,.48),0 8px 22px rgba(0,0,0,.16),inset 0 2px 4px rgba(255,255,255,.35)}',
       '#zikb-toggle:active{transform:scale(.93)}',
       '#zikb-toggle:focus-visible{outline:3px solid #fff;outline-offset:4px;box-shadow:0 0 0 7px rgba(232,93,4,.45)}#zikb-toggle.dragging{cursor:grabbing}',
       '#zikb-toggle svg{width:34px;height:34px;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.2))}',
-      '#zikb-toggle::after{content:"";position:absolute;right:6px;bottom:6px;width:16px;height:16px;background:#21c45a;border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.28);animation:zikb-pulse 2.2s ease-in-out infinite}',
-      '@keyframes zikb-pulse{0%,100%{box-shadow:0 2px 6px rgba(0,0,0,.28)}50%{box-shadow:0 2px 6px rgba(0,0,0,.28),0 0 0 6px rgba(33,196,90,.22)}}',
-      '#zikb-panel{position:fixed;bottom:120px;' + (isLeft ? 'left:24px' : 'right:24px') + ';width:440px;height:min(700px,calc(100vh - 140px));max-height:min(700px,calc(100vh - 140px));background:#fff;border:1px solid #e6dfd9;border-radius:20px;box-shadow:0 20px 56px rgba(0,0,0,.13),0 8px 20px rgba(0,0,0,.06);z-index:2147483645;display:none;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;transition:max-height .3s cubic-bezier(.4,0,.2,1),width .3s ease}',
+      '#zikb-toggle::after{content:none}',
+      '@keyframes zikb-breathe{0%,100%{box-shadow:0 12px 32px rgba(232,93,4,.42),0 6px 18px rgba(0,0,0,.14),inset 0 2px 4px rgba(255,255,255,.3)}50%{box-shadow:0 14px 36px rgba(232,93,4,.52),0 8px 22px rgba(0,0,0,.18),inset 0 2px 4px rgba(255,255,255,.35)}}',
+      '#zikb-toggle:not(.dragging):not(:hover):not(:active){animation:zikb-breathe 3s ease-in-out infinite}',
+      '#zikb-panel{position:fixed;' + panelVPos + ';' + panelHPos + ';width:440px;height:min(700px,calc(100vh - 140px));max-height:min(700px,calc(100vh - 140px));background:#fff;border:1px solid #e6dfd9;border-radius:20px;box-shadow:0 20px 56px rgba(0,0,0,.13),0 8px 20px rgba(0,0,0,.06);z-index:2147483645;display:none;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;transition:max-height .28s cubic-bezier(.4,0,.2,1),width .28s cubic-bezier(.4,0,.2,1),height .28s cubic-bezier(.4,0,.2,1),box-shadow .2s ease,border-radius .2s ease;will-change:max-height,width;-webkit-backface-visibility:hidden;backface-visibility:hidden}',
       '#zikb-panel.open{display:flex;animation:zikb-fadeIn .2s ease-out}',
-      '#zikb-panel.zikb-minimized{max-height:54px!important;overflow:hidden;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.15);transition:max-height .3s cubic-bezier(.4,0,.2,1),border-radius .2s}',
-      '#zikb-panel.zikb-minimized #zikb-body,#zikb-panel.zikb-minimized .zikb-powered{display:none}',
+      '#zikb-panel.zikb-minimized{max-height:54px!important;overflow:hidden;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.15);transition:max-height .3s cubic-bezier(.4,0,.2,1),border-radius .25s ease,box-shadow .25s ease}',
+      '#zikb-panel.zikb-minimized #zikb-body,#zikb-panel.zikb-minimized .zikb-powered{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,visibility 0s .18s}',
+      '#zikb-panel:not(.zikb-minimized) #zikb-body,#zikb-panel:not(.zikb-minimized) .zikb-powered{opacity:1;visibility:visible;transition:opacity .22s ease .08s,visibility 0s 0s}',
       '#zikb-panel.zikb-minimized #zikb-header{border-radius:14px;background:linear-gradient(135deg,' + headerColor + ' 0%,#f26322 60%,#ff7b3a 100%)}',
-      '#zikb-panel.zikb-maximized{width:90vw!important;max-width:920px;max-height:90vh!important;left:5vw!important;top:5vh!important;right:auto;bottom:auto;border-radius:20px;box-shadow:0 24px 80px rgba(0,0,0,.28),0 8px 32px rgba(232,93,4,.1);transition:all .35s cubic-bezier(.4,0,.2,1)}',
+      '#zikb-panel.zikb-maximized{width:min(920px,calc(100vw - 24px))!important;height:min(90vh,calc(100vh - 24px))!important;max-height:min(90vh,calc(100vh - 24px))!important;border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.28),0 8px 32px rgba(232,93,4,.1);transition:width .32s cubic-bezier(.4,0,.2,1),height .32s cubic-bezier(.4,0,.2,1),max-height .32s cubic-bezier(.4,0,.2,1),left .32s cubic-bezier(.4,0,.2,1),top .32s cubic-bezier(.4,0,.2,1),right .32s cubic-bezier(.4,0,.2,1),bottom .32s cubic-bezier(.4,0,.2,1),box-shadow .25s ease,border-radius .25s ease}',
       '#zikb-panel.zikb-maximized #zikb-body{flex:1 1 auto;max-height:calc(90vh - 112px)}',
       '@keyframes zikb-fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}',
-      '@media(max-width:768px){#zikb-panel{width:min(94vw,440px);height:calc(100vh - 128px);max-height:calc(100vh - 128px);bottom:112px!important;' + (isLeft ? 'left:12px!important;right:auto!important' : 'right:12px!important;left:auto!important') + '}#zikb-toggle{width:68px;height:68px;bottom:22px;' + (isLeft ? 'left:22px' : 'right:22px') + '}#zikb-toggle svg{width:30px;height:30px}#zikb-body{padding:10px 11px 5px}}',
-      '@media(max-width:480px){#zikb-toggle{width:64px;height:64px;bottom:16px;' + (isLeft ? 'left:16px' : 'right:16px') + '}#zikb-toggle svg{width:28px;height:28px}#zikb-panel{width:calc(100vw - 16px);left:8px!important;right:8px!important;height:calc(100vh - 108px);max-height:calc(100vh - 108px);bottom:96px!important;border-radius:16px}#zikb-panel.zikb-maximized{width:100vw!important;max-width:100vw;left:0!important;top:0!important;max-height:100vh!important;height:100vh!important;border-radius:0}#zikb-header{padding:.72rem .82rem;min-height:48px}#zikb-header .zikb-header-title{font-size:.92rem}#zikb-body{padding:8px 9px 5px}.zikb-section-label{padding:.52rem .65rem;font-size:.73rem}.zikb-result{padding:.68rem .78rem}.zikb-resource-grid{grid-template-columns:1fr}.zikb-compact-resource-row{flex-direction:column}.zikb-compact-resource-row .zikb-compact-section{flex:1 1 100%;min-width:100%}}',
-      '#zikb-header{padding:14px 18px;background:linear-gradient(135deg,' + headerColor + ' 0%,#f26322 55%,#ff7b3a 100%);color:#fff;font-weight:600;display:flex;align-items:center;justify-content:space-between;cursor:grab;user-select:none;min-height:54px;border-bottom:1px solid rgba(255,255,255,.12);border-radius:20px 20px 0 0}',
+      '@media(max-width:768px){#zikb-panel{width:min(94vw,440px);height:calc(100vh - 128px);max-height:calc(100vh - 128px);' + (isTop ? 'top:112px!important;bottom:auto!important' : 'bottom:112px!important;top:auto!important') + ';' + (isLeft ? 'left:12px!important;right:auto!important' : 'right:12px!important;left:auto!important') + '}#zikb-toggle{width:68px;height:68px;' + rp.vProp + ':22px;' + rp.hProp + ':22px}#zikb-toggle svg{width:30px;height:30px}#zikb-body{padding:10px 11px 2px}}',
+      '@media(max-width:480px){#zikb-toggle{width:64px;height:64px;' + rp.vProp + ':16px;' + rp.hProp + ':16px}#zikb-toggle svg{width:28px;height:28px}#zikb-panel{width:calc(100vw - 16px);left:8px!important;right:8px!important;height:calc(100vh - 108px);max-height:calc(100vh - 108px);' + (isTop ? 'top:96px!important;bottom:auto!important' : 'bottom:96px!important;top:auto!important') + ';border-radius:16px}#zikb-panel.zikb-maximized{width:100vw!important;max-width:100vw;left:0!important;top:0!important;right:0!important;bottom:0!important;max-height:100vh!important;height:100vh!important;border-radius:0}#zikb-header{padding:.72rem .82rem;min-height:48px}#zikb-header .zikb-header-title{font-size:.92rem}#zikb-body{padding:8px 9px 2px}.zikb-section-label{padding:.52rem .65rem;font-size:.73rem}.zikb-result{padding:.68rem .78rem}.zikb-resource-grid{grid-template-columns:1fr}.zikb-compact-resource-row{flex-direction:column}.zikb-compact-resource-row .zikb-compact-section{flex:1 1 100%;min-width:100%}}',
+      '#zikb-header{padding:14px 18px;background:linear-gradient(135deg,' + headerColor + ' 0%,#f26322 55%,#ff7b3a 100%);color:#fff;font-weight:600;display:flex;align-items:center;justify-content:flex-start;gap:.35rem;cursor:grab;user-select:none;min-height:54px;border-bottom:1px solid rgba(255,255,255,.12);border-radius:20px 20px 0 0}',
       '#zikb-header.zikb-dragging{cursor:grabbing}',
-      '#zikb-header .zikb-header-title{display:flex;align-items:center;gap:.46rem;font-size:.97rem;letter-spacing:.01em}',
-      '#zikb-header .zikb-header-title svg{width:17px;height:17px;opacity:.92}',
-      '.zikb-header-actions{display:flex;align-items:center;gap:.2rem;background:rgba(0,0,0,.15);border-radius:10px;padding:.2rem .25rem;backdrop-filter:blur(4px)}',
-      '.zikb-header-btn{background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;padding:.4rem;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all .2s cubic-bezier(.4,0,.2,1);position:relative}',
+      '#zikb-header .zikb-header-title{display:inline-flex;align-items:center;font-size:.97rem;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 auto}',
+      '.zikb-header-actions{display:flex;align-items:center;gap:.2rem;background:rgba(0,0,0,.15);border-radius:10px;padding:.2rem .25rem;backdrop-filter:blur(4px);overflow:visible;margin-left:auto;flex-shrink:0}',
+      '.zikb-header-btn{background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;padding:.4rem;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all .2s cubic-bezier(.4,0,.2,1);position:relative;width:32px;height:32px;flex:0 0 32px}',
       '.zikb-header-btn:hover{background:rgba(255,255,255,.2);color:#fff;transform:scale(1.1)}',
       '.zikb-header-btn:active{transform:scale(.92);background:rgba(255,255,255,.3)}',
       '.zikb-header-btn:focus-visible{outline:2px solid #fff;outline-offset:1px}',
@@ -2695,8 +2780,9 @@
       '#zikb-close{color:rgba(255,255,255,.9);order:3}',
       '#zikb-close:hover{background:rgba(255,60,60,.4);color:#fff;transform:scale(1.15)}',
       '#zikb-close:active{background:rgba(255,60,60,.55)}',
-      '#zikb-body{padding:10px 12px 5px;overflow-y:auto;flex:1 1 auto;min-height:0;max-height:none;background:#f9f7f4;color:#333;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:rgba(232,93,4,.15) transparent;overscroll-behavior:contain}',
-      '#zikb-body::-webkit-scrollbar{width:5px}#zikb-body::-webkit-scrollbar-thumb{background:rgba(232,93,4,.15);border-radius:3px}#zikb-body::-webkit-scrollbar-thumb:hover{background:rgba(232,93,4,.3)}',
+      '#zikb-body{padding:10px 12px 0;overflow-y:auto;flex:1 1 auto;min-height:0;max-height:none;background:#f9f7f4;color:#333;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:transparent transparent;overscroll-behavior:contain}',
+      '#zikb-body:hover,#zikb-body.zikb-scrolling{scrollbar-color:rgba(232,93,4,.22) transparent}',
+      '#zikb-body::-webkit-scrollbar{width:5px;background:transparent}#zikb-body::-webkit-scrollbar-thumb{background:transparent;border-radius:3px;transition:background .3s}#zikb-body:hover::-webkit-scrollbar-thumb,#zikb-body.zikb-scrolling::-webkit-scrollbar-thumb{background:rgba(232,93,4,.22)}#zikb-body::-webkit-scrollbar-thumb:hover{background:rgba(232,93,4,.4)}',
       '#zikb-msg{font-size:.9rem;color:#4f4a45;margin-bottom:6px;line-height:1.45;padding:0 2px;flex-shrink:0}',
       '#zikb-search-wrap{display:flex;align-items:center;position:relative;margin-bottom:8px;background:linear-gradient(135deg,#fff 0%,#fefdfb 100%);border:1.5px solid #ddd5cf;border-radius:14px;transition:all .2s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 6px rgba(0,0,0,.04);flex-shrink:0}',
       '#zikb-search-wrap:focus-within{border-color:' + btnColor + ';box-shadow:0 0 0 4px rgba(232,93,4,.08),0 4px 16px rgba(232,93,4,.1);background:#fff}',
@@ -2712,17 +2798,21 @@
       '#zikb-search-btn:focus-visible{outline:2px solid ' + btnColor + ';outline-offset:2px}',
       '#zikb-search-btn svg{width:14px;height:14px}',
       '[data-tooltip]{position:relative}',
-      '[data-tooltip]::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:.3rem .6rem;border-radius:5px;font-size:.7rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:10}',
+      '[data-tooltip]::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:.35rem .65rem;border-radius:6px;font-size:.72rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .18s ease;z-index:2147483647;box-shadow:0 2px 8px rgba(0,0,0,.18);line-height:1.3}',
       '[data-tooltip]:hover::after{opacity:1}',
-      '#zikb-results{display:flex;flex-direction:column;gap:2px;padding-bottom:0;margin-bottom:0;transition:opacity .15s ease}',
+      '#zikb-header [data-tooltip]::after{bottom:auto;top:calc(100% + 8px)}',
+      '#zikb-toggle[data-tooltip]::after{bottom:calc(100% + 10px);font-size:.78rem;padding:.4rem .75rem}',
+      '#zikb-results{display:flex;flex-direction:column;gap:2px;padding-bottom:0;margin-bottom:0;transition:opacity .15s ease}#zikb-results:empty{display:none}#zikb-results .zikb-ia-section:empty{display:none}.zikb-horizontal-list:empty{display:none}.zikb-section-results:empty{display:none}',
       '#zikb-results > :last-child{margin-bottom:0!important}',
+      '#zikb-body > *:last-child{margin-bottom:0}',
       '.zikb-view-tabs{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:1px 0 6px;padding:0 2px}',
       '.zikb-view-tab{border:1.5px solid #e2d8cf;background:#fff;border-radius:999px;padding:6px 13px;font-size:11.5px;font-weight:600;color:#6b5d52;cursor:pointer;transition:all .18s;white-space:nowrap}',
       '.zikb-view-tab:hover{border-color:#e85d04;color:#c24a00;background:#fff8f5}',
       '.zikb-view-tab.active{background:linear-gradient(135deg,#e85d04 0%,#f26322 100%);border-color:#e85d04;color:#fff;box-shadow:0 2px 8px rgba(232,93,4,.26)}',
       '.zikb-tab-target.zikb-hidden{display:none!important}',
-      '.zikb-compact-resource-row{display:flex;align-items:stretch;gap:10px;flex-wrap:nowrap;overflow-x:auto;padding:4px 0 8px;scrollbar-width:thin;scrollbar-color:rgba(232,93,4,.12) transparent}',
-      '.zikb-compact-resource-row::-webkit-scrollbar{height:3px}.zikb-compact-resource-row::-webkit-scrollbar-thumb{background:rgba(232,93,4,.12);border-radius:2px}',
+      '.zikb-compact-resource-row{display:flex;align-items:stretch;gap:10px;flex-wrap:nowrap;overflow-x:auto;padding:4px 0 8px;scrollbar-width:thin;scrollbar-color:transparent transparent}',
+      '.zikb-compact-resource-row:hover{scrollbar-color:rgba(232,93,4,.18) transparent}',
+      '.zikb-compact-resource-row::-webkit-scrollbar{height:3px;background:transparent}.zikb-compact-resource-row::-webkit-scrollbar-thumb{background:transparent;border-radius:2px}.zikb-compact-resource-row:hover::-webkit-scrollbar-thumb{background:rgba(232,93,4,.18)}',
       '.zikb-compact-resource-row .zikb-compact-section{flex:1 1 calc(50% - 5px);min-width:calc(50% - 5px)}',
       '.zikb-compact-section{margin:0}',
       '.zikb-compact-section .zikb-section-label{margin:0;border-radius:10px;font-size:11.5px}',
@@ -2758,11 +2848,12 @@
       '.zikb-section-label:hover .zikb-accordion-chevron{opacity:1}',
       '.zikb-accordion-chevron svg{width:14px;height:14px;transition:transform .2s ease}',
       '.zikb-accordion-label[aria-expanded="false"] .zikb-accordion-chevron svg{transform:rotate(180deg)}',
-      '.zikb-accordion-body{overflow:hidden;transition:max-height .2s ease,opacity .2s ease;max-height:3200px;opacity:1;margin-top:1px}',
-      '.zikb-accordion-body.zikb-collapsed{max-height:0;opacity:0;margin:0!important;padding:0}',
+      '.zikb-accordion-body{overflow:hidden;transition:max-height .2s ease,opacity .2s ease,visibility 0s;max-height:3200px;opacity:1;margin-top:1px;visibility:visible}',
+      '.zikb-accordion-body.zikb-collapsed{max-height:0;opacity:0;margin:0!important;padding:0;pointer-events:none;visibility:hidden;transition:max-height .2s ease,opacity .2s ease,visibility 0s .2s}',
       '.zikb-result{display:block;padding:10px 12px;background:#fff;border:1.5px solid #e8e4df;border-radius:12px;text-decoration:none;transition:all .2s cubic-bezier(.4,0,.2,1);position:relative}',
       '.zikb-result:hover{background:linear-gradient(135deg,#fff8f5,#fff);border-color:#e85d04;box-shadow:0 4px 14px rgba(232,93,4,.1);transform:translateY(-1px)}',
       '.zikb-result:active{transform:translateY(0)}',
+      '.zikb-result-content{cursor:pointer}.zikb-result-content .zikb-result-link{text-decoration:none;color:inherit;display:block;width:100%}',
       '.zikb-result.kb{border-left:4px solid ' + btnColor + '}.zikb-result.community{border-left:4px solid #f26322}',
       '.zikb-result-title{font-size:13.5px;font-weight:600;color:#2d2a26;margin-bottom:5px;line-height:1.35}',
       '.zikb-result-snippet{font-size:12.5px;color:#555;line-height:1.55;max-height:72px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;word-break:break-word;transition:max-height .35s cubic-bezier(.4,0,.2,1)}',
@@ -2776,11 +2867,12 @@
       'mark.zikb-hl-exact{background:#fff3cd;color:#7c6a00;padding:0 .1rem;border-radius:2px}',
       'mark.zikb-hl-partial{background:#fce8d4;color:#9a5a00;padding:0 .1rem;border-radius:2px}',
       'mark.zikb-hl-synonym{background:#d4e8fc;color:#1a4a8a;padding:0 .1rem;border-radius:2px}',
-      '.zikb-expand{margin-top:.5rem;background:linear-gradient(135deg,#faf8f5,#fff);border:1.5px solid #f0e6dd;border-radius:12px;padding:.9rem;font-size:.82rem;color:#444;line-height:1.65;display:none;max-height:240px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(232,93,4,.25) transparent;animation:zikb-expandIn .35s cubic-bezier(.4,0,.2,1);box-shadow:inset 0 1px 3px rgba(0,0,0,.04)}',
+      '.zikb-expand{margin-top:.5rem;background:linear-gradient(135deg,#faf8f5,#fff);border:1.5px solid #f0e6dd;border-radius:12px;padding:.9rem;font-size:.82rem;color:#444;line-height:1.65;display:none;max-height:240px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:transparent transparent;animation:zikb-expandIn .35s cubic-bezier(.4,0,.2,1);box-shadow:inset 0 1px 3px rgba(0,0,0,.04)}',
+      '.zikb-expand:hover{scrollbar-color:rgba(232,93,4,.25) transparent}',
       '.zikb-expand.open{display:block}',
       '@keyframes zikb-expandIn{from{opacity:0;max-height:0;transform:translateY(-4px)}to{opacity:1;max-height:240px;transform:translateY(0)}}',
-      '.zikb-expand::-webkit-scrollbar{width:4px}',
-      '.zikb-expand::-webkit-scrollbar-thumb{background:rgba(232,93,4,.25);border-radius:2px}',
+      '.zikb-expand::-webkit-scrollbar{width:4px;background:transparent}',
+      '.zikb-expand::-webkit-scrollbar-thumb{background:transparent;border-radius:2px}.zikb-expand:hover::-webkit-scrollbar-thumb{background:rgba(232,93,4,.25)}',
       '.zikb-expand-toggle{font-size:.75rem;color:#c24a00;cursor:pointer;text-decoration:underline;margin-top:.3rem;display:inline-block}',
       '.zikb-fb{display:flex;gap:.3rem;margin-top:.35rem}',
       '.zikb-fb-btn{padding:.18rem .45rem;background:#f5f3f0;border:1.5px solid #e8e4df;border-radius:5px;font-size:.68rem;cursor:pointer;color:#888;transition:all .18s}',
@@ -2790,10 +2882,11 @@
       '.zikb-more-btn{padding:.55rem;background:#f5f3f0;border:1.5px solid #e8e4df;border-radius:10px;color:#5a5652;font-size:.8rem;text-align:center;cursor:pointer;transition:all .18s;font-weight:500}',
       '.zikb-more-btn:hover{background:#fff8f5;color:#c24a00;border-color:#e85d04;box-shadow:0 2px 6px rgba(232,93,4,.1)}',
       '.zikb-link{display:block;padding:.7rem 1rem;background:#fff;border:1.5px solid #e8e4df;border-radius:10px;color:#c24a00;font-size:.86rem;text-decoration:none;transition:all .18s;margin-top:.4rem}',
-      '.zikb-link:hover{background:#fff8f5;border-color:#e85d04;box-shadow:0 2px 8px rgba(232,93,4,.08)}.zikb-link.ticket{border-left:4px solid #d35400}',
+      '.zikb-link:hover{background:#fff8f5;border-color:#e85d04;box-shadow:0 2px 8px rgba(232,93,4,.08)}.zikb-link.ticket{border-left:4px solid #d35400}.zikb-link[href=""]{display:none!important}.zikb-qa-link[href=""]{display:none!important}.zikb-guide-item[href=""]{display:none!important}a[href=""]{display:none!important;pointer-events:none}a:not([href]){pointer-events:none}.zikb-ia-section:empty{display:none!important}.zikb-section-results:empty{display:none!important}.zikb-horizontal-list:empty{display:none!important}.zikb-accordion-body:empty{display:none!important}',
       '.zikb-divider{border:0;border-top:1.5px solid #efe9e3;margin:.25rem 0}',
-      '.zikb-resource-masonry{display:flex;gap:8px;align-items:stretch;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin;scrollbar-color:rgba(232,93,4,.12) transparent;scroll-snap-type:x proximity}',
-      '.zikb-resource-masonry::-webkit-scrollbar{height:3px}.zikb-resource-masonry::-webkit-scrollbar-thumb{background:rgba(232,93,4,.12);border-radius:2px}',
+      '.zikb-resource-masonry{display:flex;gap:8px;align-items:stretch;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin;scrollbar-color:transparent transparent;scroll-snap-type:x proximity}',
+      '.zikb-resource-masonry:hover{scrollbar-color:rgba(232,93,4,.18) transparent}',
+      '.zikb-resource-masonry::-webkit-scrollbar{height:3px;background:transparent}.zikb-resource-masonry::-webkit-scrollbar-thumb{background:transparent;border-radius:2px}.zikb-resource-masonry:hover::-webkit-scrollbar-thumb{background:rgba(232,93,4,.18)}',
       '.zikb-resource-masonry .zikb-ia-section{margin:0;flex:1 1 calc(50% - 4px);min-width:calc(50% - 4px);scroll-snap-align:start}',
       '.zikb-horizontal-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:8px;overflow:visible;padding:6px 0 2px}',
       '.zikb-horizontal-actions{grid-template-columns:repeat(2,minmax(0,1fr))}',
@@ -2865,15 +2958,14 @@
       '.zikb-status-online{background:#d4edda;color:#155724}',
       '.zikb-status-offline{background:#f8d7da;color:#721c24}',
       '.zikb-status-loading{background:#fff3cd;color:#856404}',
-      '.zikb-kbd-hint{font-size:.65rem;color:rgba(255,255,255,.6);margin-left:.25rem}',
-      '.zikb-powered{text-align:center;padding:.32rem .6rem .38rem;font-size:.68rem;color:#bbb;border-top:1.5px solid #f0eeeb;background:#fafaf8;border-radius:0 0 20px 20px;flex:0 0 auto;line-height:1.2}',
+      '.zikb-powered{text-align:center;padding:.32rem .6rem .38rem;font-size:.68rem;color:#bbb;border-top:1.5px solid #f0eeeb;background:#fafaf8;border-radius:0 0 20px 20px;flex:0 0 auto;line-height:1.2;margin-top:auto}',
       '@media(prefers-reduced-motion:reduce){#zikb-panel,#zikb-toggle,.zikb-result,.zikb-section-results{transition:none!important;animation:none!important}}',
       '.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}',
       '.zikb-spell{background:#e8f4fd;border:1.5px solid #b3d7f0;border-radius:12px;padding:.65rem .9rem;margin-bottom:8px;font-size:.82rem;color:#1a5276}',
       '.zikb-spell-link{color:#c24a00;cursor:pointer;font-weight:600;text-decoration:underline}',
       '.zikb-spell-link:hover{color:#e85d04}',
       '.zikb-spell-orig{color:#888;font-size:.75rem;font-style:italic}',
-      '#zikb-panel.zikb-panel-dragging{opacity:.92;box-shadow:0 12px 48px rgba(0,0,0,.25);transition:none}',
+      '#zikb-panel.zikb-panel-dragging{opacity:.92;box-shadow:0 12px 48px rgba(0,0,0,.25);transition:none!important}',
       '#zikb-header .zikb-grip{opacity:.4;margin-right:.25rem;display:flex;align-items:center}',
       '#zikb-header:hover .zikb-grip{opacity:.7}'
     ].join('');
@@ -2883,6 +2975,7 @@
   /* =================== UI RENDERING =================== */
 
   var _panel, _toggle, _input, _resultsEl, _product, _config, _lastQuery = '';
+  var _preMaxPanelInline = null;
   var _indexLoadError = false;
   var _indexUrl = null;
   var _debounceTimer = null;
@@ -2890,7 +2983,7 @@
 
   function svgIcon(name) {
     var icons = {
-      chat:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/><circle cx="8.5" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="11.5" r="1" fill="currentColor" stroke="none"/></svg>',
+      chat:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/></svg>',
       book:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
       users:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
       check:'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>',
@@ -2909,11 +3002,13 @@
       chevronUp:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>',
       grip:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1.5" fill="currentColor"/><circle cx="15" cy="5" r="1.5" fill="currentColor"/><circle cx="9" cy="12" r="1.5" fill="currentColor"/><circle cx="15" cy="12" r="1.5" fill="currentColor"/><circle cx="9" cy="19" r="1.5" fill="currentColor"/><circle cx="15" cy="19" r="1.5" fill="currentColor"/></svg>',
       minimize:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"/></svg>',
-      maximize:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>',
-      restore:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M7 5V3h14v14h-2"/></svg>',
+      maximize:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
+      restore:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="13" height="13" rx="2"/><path d="M8 7V4h13v13h-3"/></svg>',
       enter:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 10l-5 5 5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>',
       collapseAll:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/></svg>',
-      expandAll:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg>'
+      expandAll:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg>',
+      clock:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+      lightbulb:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>'
     };
     return icons[name] || icons.book;
   }
@@ -2948,8 +3043,8 @@
       ' data-solved="' + (article.solved ? 'true' : 'false') + '"' +
       ' data-idx="' + idx + '"' +
       ' aria-label="' + esc(article.title || 'Result') + ' - ' + scoreDisplay + '% match">';
-    html += '<a href="' + esc(deepUrl) + '" target="_blank" rel="noopener" class="zikb-result-link" data-article-id="' + esc(article.id) + '" style="text-decoration:none;color:inherit;display:block">';
-    html += '<div class="zikb-result-title">' + highlightWithTypes(article.title || 'Untitled', keywords, synonymList) + '</div>';
+    html += '<div class="zikb-result-content" data-href="' + esc(deepUrl) + '" data-article-id="' + esc(article.id) + '">';
+    html += '<a href="' + esc(deepUrl) + '" target="_blank" rel="noopener" class="zikb-result-link" data-article-id="' + esc(article.id) + '"><div class="zikb-result-title">' + highlightWithTypes(article.title || 'Untitled', keywords, synonymList) + '</div></a>';
 
     if (snippetText) {
       html += '<div class="zikb-result-snippet">' + highlightWithTypes(snippetText, keywords, synonymList) + '</div>';
@@ -2970,7 +3065,7 @@
     else if (topSection && topSection.heading) html += '<span class="zikb-badge zikb-badge-section">\u00a7 ' + esc(topSection.heading) + '</span>';
     if ((article.type || '').toLowerCase() === 'community' && article.replies != null) html += '<span class="zikb-badge" style="background:#f5f3f0;color:#888">' + article.replies + ' replies</span>';
     html += '</div>';
-    html += '</a>';
+    html += '</div>';
 
     if (topPara && topPara.text && topPara.text.length > 50) {
       html += '<span class="zikb-expand-toggle" data-expand="' + uid + '">Read answer inline \u25be</span>';
@@ -2996,6 +3091,123 @@
 
     html += '</article>';
     return html;
+  }
+
+  function syncWindowControlState() {
+    if (!_panel) return;
+    var minBtn = _panel.querySelector('#zikb-minimize-btn');
+    var maxBtn = _panel.querySelector('#zikb-maximize-btn');
+    if (!minBtn || !maxBtn) return;
+    var isMinimized = _panel.classList.contains('zikb-minimized');
+    var isMaximized = _panel.classList.contains('zikb-maximized');
+
+    var minIcon = isMinimized ? svgIcon('chevronUp') : svgIcon('minimize');
+    var minLabel = isMinimized ? 'Restore' : 'Minimize';
+    if (minBtn.innerHTML !== minIcon) minBtn.innerHTML = minIcon;
+    minBtn.setAttribute('aria-label', minLabel);
+    minBtn.setAttribute('data-tooltip', minLabel);
+
+    var maxIcon = isMaximized ? svgIcon('restore') : svgIcon('maximize');
+    var maxLabel = isMaximized ? 'Restore' : 'Maximize';
+    if (maxBtn.innerHTML !== maxIcon) maxBtn.innerHTML = maxIcon;
+    maxBtn.setAttribute('aria-label', maxLabel);
+    maxBtn.setAttribute('data-tooltip', maxLabel);
+
+    if (isMinimized) {
+      maxBtn.style.opacity = '0.4';
+      maxBtn.style.pointerEvents = 'none';
+    } else {
+      maxBtn.style.opacity = '';
+      maxBtn.style.pointerEvents = '';
+    }
+  }
+
+  function clampPanelToViewport() {
+    if (!_panel) return;
+    var rect = _panel.getBoundingClientRect();
+    var minInset = 8;
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var hasInlineLeft = !!(_panel.style.left && _panel.style.left !== 'auto');
+    var hasInlineTop = !!(_panel.style.top && _panel.style.top !== 'auto');
+
+    if (hasInlineLeft) {
+      var maxLeft = vw - rect.width - minInset;
+      if (maxLeft < minInset) maxLeft = minInset;
+      var nextLeft = Math.max(minInset, Math.min(maxLeft, rect.left));
+      _panel.style.left = nextLeft + 'px';
+      _panel.style.right = 'auto';
+    }
+    if (hasInlineTop) {
+      var maxTop = vh - Math.min(rect.height, vh - minInset * 2) - minInset;
+      if (maxTop < minInset) maxTop = minInset;
+      var nextTop = Math.max(minInset, Math.min(maxTop, rect.top));
+      _panel.style.top = nextTop + 'px';
+      _panel.style.bottom = 'auto';
+    }
+    if (!hasInlineLeft && !hasInlineTop) {
+      if (rect.right > vw) _panel.style.right = minInset + 'px';
+      if (rect.bottom > vh) _panel.style.bottom = minInset + 'px';
+      if (rect.left < 0) _panel.style.left = minInset + 'px';
+      if (rect.top < 0) _panel.style.top = minInset + 'px';
+    }
+  }
+
+  function enterMaximizedState() {
+    if (!_panel) return;
+    if (_panel.classList.contains('zikb-maximized')) return;
+    _preMaxPanelInline = {
+      left: _panel.style.left || '',
+      top: _panel.style.top || '',
+      right: _panel.style.right || '',
+      bottom: _panel.style.bottom || '',
+      width: _panel.style.width || '',
+      height: _panel.style.height || '',
+      maxHeight: _panel.style.maxHeight || ''
+    };
+    var rect = _panel.getBoundingClientRect();
+    _panel.style.left = rect.left + 'px';
+    _panel.style.top = rect.top + 'px';
+    _panel.style.right = 'auto';
+    _panel.style.bottom = 'auto';
+    _panel.style.width = rect.width + 'px';
+    _panel.style.height = rect.height + 'px';
+    void _panel.offsetHeight;
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var maxW = Math.min(920, vw - 24);
+    var maxH = Math.min(Math.round(vh * 0.9), vh - 24);
+    var centeredLeft = Math.max(12, Math.round((vw - maxW) / 2));
+    var centeredTop = Math.max(12, Math.round((vh - maxH) / 2));
+    _panel.style.left = centeredLeft + 'px';
+    _panel.style.top = centeredTop + 'px';
+    _panel.style.width = '';
+    _panel.style.height = '';
+    _panel.classList.add('zikb-maximized');
+  }
+
+  function exitMaximizedState() {
+    if (!_panel) return;
+    if (!_panel.classList.contains('zikb-maximized')) return;
+    _panel.classList.remove('zikb-maximized');
+    if (_preMaxPanelInline) {
+      if (_preMaxPanelInline.left || _preMaxPanelInline.top) {
+        _panel.style.left = _preMaxPanelInline.left;
+        _panel.style.top = _preMaxPanelInline.top;
+        _panel.style.right = _preMaxPanelInline.right;
+        _panel.style.bottom = _preMaxPanelInline.bottom;
+      } else {
+        _panel.style.left = '';
+        _panel.style.top = '';
+        _panel.style.right = '';
+        _panel.style.bottom = '';
+      }
+      _panel.style.width = _preMaxPanelInline.width;
+      _panel.style.height = _preMaxPanelInline.height;
+      _panel.style.maxHeight = _preMaxPanelInline.maxHeight;
+    }
+    _preMaxPanelInline = null;
+    requestAnimationFrame(function () { clampPanelToViewport(); });
   }
 
   function showLoading() {
@@ -3222,7 +3434,7 @@
 
     var defaultQueries = ['How to publish a course', 'SCORM package error', 'Getting started with ' + esc(p.label)];
     html += '<section class="zikb-ia-section zikb-ia-suggested" role="region" aria-label="Suggested Queries">';
-    html += '<button class="zikb-section-label zikb-accordion-label" type="button" data-accordion-target="welcome-suggested-body" aria-expanded="false">' + svgIcon('search') + ' Suggested Queries <span class="zikb-accordion-chevron">' + svgIcon('chevronUp') + '</span></button>';
+    html += '<button class="zikb-section-label zikb-accordion-label" type="button" data-accordion-target="welcome-suggested-body" aria-expanded="false">' + svgIcon('lightbulb') + ' Suggested Queries <span class="zikb-accordion-chevron">' + svgIcon('chevronUp') + '</span></button>';
     html += '<div class="zikb-accordion-body zikb-collapsed" id="welcome-suggested-body">';
     html += '<div class="zikb-suggest-list">';
     defaultQueries.forEach(function (dq) {
@@ -3316,6 +3528,16 @@
       });
     });
 
+    _resultsEl.querySelectorAll('.zikb-result-content[data-href]').forEach(function (card) {
+      card.addEventListener('click', function (e) {
+        if (e.target.closest && (e.target.closest('a') || e.target.closest('button') || e.target.closest('.zikb-expand-toggle') || e.target.closest('.zikb-fb-btn'))) return;
+        var href = card.getAttribute('data-href');
+        var aid = card.getAttribute('data-article-id');
+        if (aid && currentQuery) trackClick(aid, currentQuery);
+        if (href) window.open(href, '_blank', 'noopener');
+      });
+    });
+
     _resultsEl.querySelectorAll('[data-guide-key]').forEach(function (link) {
       link.addEventListener('click', function () {
         trackQuickGuideUsage(link.getAttribute('data-guide-key'));
@@ -3394,7 +3616,7 @@
 
   function loadConfig(cb) {
     var inline = window.zikbConfig || window.elbHelpBotConfig;
-    if (inline && typeof inline === 'object' && (inline.adminOverrides || inline.products)) { cb(inline); return; }
+    if (inline && typeof inline === 'object' && (inline.adminOverrides || inline.products || inline.theme)) { cb(inline); return; }
     var url = window.zikbConfigUrl || window.elbHelpBotConfigUrl;
     if (isValidConfigUrl(url)) {
       var xhr = new XMLHttpRequest();
@@ -3426,12 +3648,12 @@
       if (!_panel) {
         _toggle = document.createElement('button');
         _toggle.id = 'zikb-toggle'; _toggle.type = 'button';
-        _toggle.setAttribute('aria-label', 'Open ELB Assistant');
-        _toggle.setAttribute('data-tooltip', 'ELB Assistant');
+        _toggle.setAttribute('aria-label', 'Help');
+        _toggle.setAttribute('data-tooltip', 'Need help?');
         _toggle.innerHTML = svgIcon('chat');
         _panel = document.createElement('div');
         _panel.id = 'zikb-panel'; _panel.setAttribute('role', 'dialog');
-        _panel.setAttribute('aria-label', 'ELB Assistant â€” Knowledge Base & Community Help');
+        _panel.setAttribute('aria-label', 'Knowledge Assistant Engine â€” Knowledge Base & Community Help');
         _panel.setAttribute('aria-modal', 'false');
         document.body.appendChild(_toggle); document.body.appendChild(_panel);
         _panel.addEventListener('click', function (e) { e.stopPropagation(); });
@@ -3441,7 +3663,7 @@
       _panel.innerHTML =
         '<a class="zikb-skip-link" href="#zikb-search-input">Skip to search</a>' +
         '<header id="zikb-header" role="banner"><span class="zikb-grip" aria-hidden="true">' + svgIcon('grip') + '</span>' +
-        '<span class="zikb-header-title">' + svgIcon('book') + ' ELB Assistant</span>' +
+        '<span class="zikb-header-title">ELB Assistant</span>' +
         '<div class="zikb-header-actions">' +
         '<button id="zikb-reload-btn" class="zikb-header-btn" type="button" aria-label="Reload assistant" data-tooltip="Reload">' + svgIcon('reload') + '</button>' +
         '<button id="zikb-minimize-btn" class="zikb-header-btn" type="button" aria-label="Minimize" data-tooltip="Minimize">' + svgIcon('minimize') + '</button>' +
@@ -3449,15 +3671,25 @@
         '<button id="zikb-close" class="zikb-header-btn" type="button" aria-label="Close assistant" data-tooltip="Close">' + svgIcon('clear') + '</button>' +
         '</div></header>' +
         '<main id="zikb-body" role="main"><div id="zikb-msg">' + esc(p.welcomeMessage) + '</div>' +
-        '<div id="zikb-search-wrap" role="search" aria-label="Search knowledge base">' +
-        '<input id="zikb-search-input" type="text" placeholder="Search knowledge base\u2026" autocomplete="off" aria-label="Search knowledge base and community" role="searchbox">' +
+        '<div id="zikb-search-wrap" role="search" aria-label="Search Knowledge Base and Community">' +
+        '<input id="zikb-search-input" type="text" placeholder="Search KB & Community…" autocomplete="off" aria-label="Search Knowledge Base and Community" role="searchbox">' +
         '<button id="zikb-search-btn" type="button" aria-label="Search" data-tooltip="Search">' + svgIcon('search') + '</button></div>' +
         '<div id="zikb-status" aria-live="polite" role="status"></div>' +
         '<div id="zikb-results" role="region" aria-live="polite" aria-label="Search results"></div></main>' +
-        '<footer class="zikb-powered" role="contentinfo">ELB Assistant v' + VERSION + ' <span class="zikb-kbd-hint">Ctrl+Shift+H</span></footer>';
+        '<footer class="zikb-powered" role="contentinfo">Knowledge Assistant Engine v' + VERSION + '</footer>';
 
       _input = _panel.querySelector('#zikb-search-input');
       _resultsEl = _panel.querySelector('#zikb-results');
+
+      var _bodyEl = _panel.querySelector('#zikb-body');
+      var _scrollRevealTimer;
+      if (_bodyEl) {
+        _bodyEl.addEventListener('scroll', function () {
+          _bodyEl.classList.add('zikb-scrolling');
+          clearTimeout(_scrollRevealTimer);
+          _scrollRevealTimer = setTimeout(function () { _bodyEl.classList.remove('zikb-scrolling'); }, 1000);
+        }, { passive: true });
+      }
 
       _panel.querySelector('#zikb-search-btn').addEventListener('click', doSearch);
       _input.addEventListener('keydown', function (e) { if (e.key === 'Enter') doSearch(); });
@@ -3477,25 +3709,36 @@
         }
       });
       _panel.querySelector('#zikb-close').addEventListener('click', function () {
-        _panel.classList.remove('open', 'zikb-minimized', 'zikb-maximized');
+        _panel.classList.remove('open');
+        resetMinMaxState();
         persistPanelState(false);
         _toggle.focus();
       });
-      _panel.querySelector('#zikb-minimize-btn').addEventListener('click', function () {
-        var isMinimized = _panel.classList.toggle('zikb-minimized');
-        _panel.classList.remove('zikb-maximized');
-        var minBtn = _panel.querySelector('#zikb-minimize-btn');
-        minBtn.innerHTML = isMinimized ? svgIcon('restore') : svgIcon('minimize');
-        minBtn.setAttribute('aria-label', isMinimized ? 'Restore' : 'Minimize');
-        minBtn.setAttribute('data-tooltip', isMinimized ? 'Restore' : 'Minimize');
+      _panel.querySelector('#zikb-minimize-btn').addEventListener('click', function (e) {
+        e.stopPropagation();
+        var wasMaximized = _panel.classList.contains('zikb-maximized');
+        if (wasMaximized) exitMaximizedState();
+        var willMinimize = !_panel.classList.contains('zikb-minimized');
+        if (willMinimize) {
+          _panel.classList.add('zikb-minimized');
+        } else {
+          _panel.classList.remove('zikb-minimized');
+        }
+        void _panel.offsetHeight;
+        syncWindowControlState();
       });
-      _panel.querySelector('#zikb-maximize-btn').addEventListener('click', function () {
-        _panel.classList.remove('zikb-minimized');
-        var isMaximized = _panel.classList.toggle('zikb-maximized');
-        var maxBtn = _panel.querySelector('#zikb-maximize-btn');
-        maxBtn.innerHTML = isMaximized ? svgIcon('restore') : svgIcon('maximize');
-        maxBtn.setAttribute('aria-label', isMaximized ? 'Restore size' : 'Maximize');
-        maxBtn.setAttribute('data-tooltip', isMaximized ? 'Restore' : 'Maximize');
+      _panel.querySelector('#zikb-maximize-btn').addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (_panel.classList.contains('zikb-minimized')) {
+          _panel.classList.remove('zikb-minimized');
+          void _panel.offsetHeight;
+        }
+        if (_panel.classList.contains('zikb-maximized')) {
+          exitMaximizedState();
+        } else {
+          enterMaximizedState();
+        }
+        syncWindowControlState();
       });
       _panel.querySelector('#zikb-reload-btn').addEventListener('click', function () { reloadChatbot(); });
       setupPanelDrag();
@@ -3581,6 +3824,20 @@
     });
   }
 
+  /* =================== MIN/MAX RESET HELPER =================== */
+
+  function resetMinMaxState() {
+    if (!_panel) return;
+    var wasMinimized = _panel.classList.contains('zikb-minimized');
+    var wasMaximized = _panel.classList.contains('zikb-maximized');
+    if (wasMinimized) _panel.classList.remove('zikb-minimized');
+    if (wasMaximized) exitMaximizedState();
+    if (wasMinimized || wasMaximized) {
+      void _panel.offsetHeight;
+      syncWindowControlState();
+    }
+  }
+
   /* =================== DRAG (Toggle + Panel) =================== */
 
   var PANEL_POS_KEY = 'elb-help-bot-panel-pos';
@@ -3593,7 +3850,14 @@
       var panelPos = getPanelSavedPos();
       if (!panelPos) {
         _panel.style.left = Math.min(x, window.innerWidth - 444) + 'px';
-        _panel.style.right = 'auto'; _panel.style.bottom = (window.innerHeight - y + 12) + 'px'; _panel.style.top = 'auto';
+        _panel.style.right = 'auto';
+        var belowToggle = y + 88;
+        var aboveToggle = y - 12;
+        if (belowToggle + 500 < window.innerHeight) {
+          _panel.style.top = belowToggle + 'px'; _panel.style.bottom = 'auto';
+        } else {
+          _panel.style.bottom = (window.innerHeight - aboveToggle) + 'px'; _panel.style.top = 'auto';
+        }
       }
     }
     try { var raw = JSON.parse(localStorage.getItem(POS_STORAGE_KEY)); if (raw && typeof raw.x === 'number') pos(raw.x, raw.y); } catch (e) { /* */ }
@@ -3607,7 +3871,7 @@
     function end() {
       _toggle.classList.remove('dragging');
       if (isDrag) { try { var r = _toggle.getBoundingClientRect(); localStorage.setItem(POS_STORAGE_KEY, JSON.stringify({ x: r.left, y: r.top })); } catch (e) { /* */ } }
-      else { _panel.classList.toggle('open'); persistPanelState(_panel.classList.contains('open')); if (_panel.classList.contains('open') && _input) setTimeout(function () { _input.focus(); }, 100); }
+      else { var nowOpen = _panel.classList.toggle('open'); resetMinMaxState(); persistPanelState(nowOpen); if (nowOpen && _input) setTimeout(function () { _input.focus(); }, 100); }
     }
 
     _toggle.addEventListener('mousedown', function (e) {
@@ -3624,7 +3888,7 @@
     }, { passive: true });
     _toggle.addEventListener('click', function (e) { e.preventDefault(); });
     _toggle.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _panel.classList.toggle('open'); persistPanelState(_panel.classList.contains('open')); if (_panel.classList.contains('open') && _input) setTimeout(function () { _input.focus(); }, 100); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); var nowOpen = _panel.classList.toggle('open'); resetMinMaxState(); persistPanelState(nowOpen); if (nowOpen && _input) setTimeout(function () { _input.focus(); }, 100); }
     });
   }
 
@@ -3659,7 +3923,8 @@
       var dx = cx - startX, dy = cy - startY;
       if (!isDrag && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) isDrag = true;
       if (isDrag) {
-        var newX = Math.max(0, Math.min(window.innerWidth - 440, origLeft + dx));
+        var panelW = _panel.getBoundingClientRect().width || 440;
+        var newX = Math.max(0, Math.min(window.innerWidth - panelW, origLeft + dx));
         var newY = Math.max(0, Math.min(window.innerHeight - 100, origTop + dy));
         _panel.style.left = newX + 'px';
         _panel.style.top = newY + 'px';
@@ -3698,21 +3963,25 @@
 
     window.addEventListener('resize', function () {
       if (!_panel.classList.contains('open')) return;
-      var rect = _panel.getBoundingClientRect();
-      var maxX = window.innerWidth - 440, maxY = window.innerHeight - 200;
-      if (rect.left > maxX || rect.top > maxY) {
-        _panel.style.left = Math.max(0, Math.min(maxX, rect.left)) + 'px';
-        _panel.style.top = Math.max(0, Math.min(maxY, rect.top)) + 'px';
+      if (_panel.classList.contains('zikb-maximized')) {
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        var maxW = Math.min(920, vw - 24);
+        var maxH = Math.min(Math.round(vh * 0.9), vh - 24);
+        _panel.style.left = Math.max(12, Math.round((vw - maxW) / 2)) + 'px';
+        _panel.style.top = Math.max(12, Math.round((vh - maxH) / 2)) + 'px';
+      } else {
+        clampPanelToViewport();
       }
     });
   }
 
   function setupOutsideClick() {
     document.addEventListener('click', function (e) {
-      if (_panel && _panel.classList.contains('open') && !_panel.contains(e.target) && !_toggle.contains(e.target)) { _panel.classList.remove('open'); persistPanelState(false); }
+      if (_panel && _panel.classList.contains('open') && !_panel.contains(e.target) && !_toggle.contains(e.target)) { _panel.classList.remove('open'); resetMinMaxState(); persistPanelState(false); }
     });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && _panel && _panel.classList.contains('open')) { _panel.classList.remove('open'); persistPanelState(false); _toggle.focus(); }
+      if (e.key === 'Escape' && _panel && _panel.classList.contains('open')) { _panel.classList.remove('open'); resetMinMaxState(); persistPanelState(false); _toggle.focus(); }
     });
   }
 
@@ -3800,9 +4069,10 @@
       if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
         e.preventDefault();
         if (_panel) {
-          _panel.classList.toggle('open');
-          persistPanelState(_panel.classList.contains('open'));
-          if (_panel.classList.contains('open') && _input) setTimeout(function () { _input.focus(); }, 100);
+          var nowOpen = _panel.classList.toggle('open');
+          resetMinMaxState();
+          persistPanelState(nowOpen);
+          if (nowOpen && _input) setTimeout(function () { _input.focus(); }, 100);
           else if (_toggle) _toggle.focus();
         }
       }
